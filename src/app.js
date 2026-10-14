@@ -322,6 +322,7 @@
       }
       Sidebar.refresh();
     } else if (e.type === 'folders') { Sidebar.refresh(); syncAccess(); }
+    else if (e.type === 'stickers') { if (!pop.hidden && pop.querySelector('.team-stickers')) loadTeamStickers(); }
     else if (e.type === 'open' && e.id) {
       if (await Store.get(e.id)) { if (!map || map.id !== e.id) await openMap(e.id); window.focus(); }
     } else if (e.type === 'status') updateSaveTip();
@@ -2264,13 +2265,12 @@
   }
 
   // Imágenes: se reducen a 1600 px como máximo y se guardan dentro del mapa.
-  async function imageFromFile(file) {
+  async function imageFromFile(file, max = 1600) {
     const url = URL.createObjectURL(file);
     try {
       const img = new Image();
       img.src = url;
       await img.decode();
-      const max = 1600;
       const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
       const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
       let src;
@@ -3024,7 +3024,9 @@
       html = `<div class="size-grid">${TEXT_SIZES.map(([s]) => `<button class="size-btn${it.size === s ? ' on' : ''}" data-act="text-size" data-arg="${s}">${s}</button>`).join('')}</div>`;
     } else if (kind === 'menu-icon' || kind === 'menu-sticker') {
       const act = kind === 'menu-icon' ? 'icon' : 'sticker';
+      const team = act === 'sticker' && pendingSticker && Store.status().mode === 'online';
       html = `<div class="icon-panel"><input class="icon-search" placeholder="${act === 'icon' ? t('Buscar icono…') : t('Buscar sticker…')}" />` +
+        (team ? `<div class="team-stickers">${teamStickerGrid('')}</div>` : '') +
         `<div class="icon-results">${iconGrid('', act)}</div>` +
         (act === 'icon' && tg && tg.icon ? `<div class="menu-sep"></div>${item('icon', t('Quitar icono'), '', '')}` : '') + '</div>';
     } else if (kind === 'menu-more') {
@@ -3188,8 +3190,57 @@
     if (search) {
       search.focus();
       const act = kind === 'menu-icon' ? 'icon' : 'sticker';
-      search.addEventListener('input', () => { pop.querySelector('.icon-results').innerHTML = iconGrid(search.value, act); });
+      search.addEventListener('input', () => {
+        pop.querySelector('.icon-results').innerHTML = iconGrid(search.value, act);
+        const ts = pop.querySelector('.team-stickers');
+        if (ts) ts.innerHTML = teamStickerGrid(search.value);
+      });
     }
+    if (pop.querySelector('.team-stickers')) loadTeamStickers();
+  }
+
+  // ---------- Stickers del equipo (versión de Wild) ----------
+  // Imágenes que sube cualquiera del equipo; al ponerlas en un tablero se copian como imagen (así se exportan bien).
+  let teamStickers = [];
+  async function loadTeamStickers() {
+    try { teamStickers = (await Store.api('GET', 'api/stickers')).stickers || []; } catch { return; }
+    const ts = pop.querySelector('.team-stickers');
+    if (ts) ts.innerHTML = teamStickerGrid(pop.querySelector('.icon-search')?.value || '');
+  }
+  function teamStickerGrid(q) {
+    const term = q.trim().toLowerCase();
+    const me = Store.status().user;
+    const hits = teamStickers.filter((s) => !term || (s.name || '').toLowerCase().includes(term));
+    return `<div class="icon-cat">${t('Del equipo')}<label class="ts-add" data-tip="${t('Sube PNG, WebP, GIF o JPG (puedes elegir varios)')}">+ ${t('Subir')}<input type="file" accept="image/png,image/webp,image/gif,image/jpeg" multiple hidden data-ts-upload></label></div>` +
+      (hits.length ? `<div class="ts-grid">${hits.map((s) => `<button class="ts-cell" data-act="team-sticker" data-arg="${s.id}" data-tip="${esc(s.name || '')}">` +
+        `<img src="api/media/${encodeURIComponent(s.mediaId)}" alt="" loading="lazy" draggable="false">` +
+        (!me || !s.by || s.by === me.id || me.role === 'admin' ? `<span class="ts-del" data-act="team-sticker-del" data-arg="${s.id}" title="${t('Quitar de los stickers del equipo')}">×</span>` : '') + '</button>').join('')}</div>`
+        : `<div class="ts-empty">${term ? t('Sin resultados') : t('Todavía no hay stickers del equipo. Sube los vuestros con «+ Subir».')}</div>`);
+  }
+  async function uploadTeamStickers(files) {
+    let n = 0;
+    for (const file of files) {
+      if (!/^image\/(png|webp|gif|jpeg)$/.test(file.type)) { toast(t('{name}: ese formato no vale (usa PNG, WebP, GIF o JPG)', { name: file.name })); continue; }
+      try {
+        const { src, w, h } = await imageFromFile(file, 512);
+        const blob = await (await fetch(src)).blob();
+        const mediaId = uid();
+        const r = await fetch(`api/media/${mediaId}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type, 'X-Media-Name': encodeURIComponent(file.name) } });
+        if (!r.ok) throw new Error(String(r.status));
+        await Store.api('POST', 'api/stickers', { mediaId, w, h, name: file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ') });
+        n++;
+      } catch (e) { toast(t('No se pudo subir {name}', { name: file.name })); }
+    }
+    if (n) toast(t('{n} sticker(s) añadidos', { n }));
+    loadTeamStickers();
+  }
+  async function placeTeamSticker(id, at) {
+    const s = teamStickers.find((x) => x.id === id);
+    if (!s) return;
+    const blob = await (await fetch(`api/media/${encodeURIComponent(s.mediaId)}`)).blob();
+    const src = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
+    const w = 180;
+    createItem('image', at, { src, w, h: Math.round((s.h * w) / s.w) });
   }
 
   // Palabras clave de un icono: en inglés van primero las inglesas (las españolas también encuentran).
@@ -3242,6 +3293,17 @@
       case 'note-color': closePopover(); noteColor = arg; pref('mindmap:noteColor', arg); return setItem(selItem, { color: arg });
       case 'text-color': closePopover(); return setItem(selItem, { color: arg });
       case 'text-size': closePopover(); return setItem(selItem, { size: arg });
+      case 'team-sticker': {
+        const at = pendingSticker;
+        pendingSticker = null;
+        closePopover();
+        return at && placeTeamSticker(arg, at);
+      }
+      case 'team-sticker-del': {
+        const s = teamStickers.find((x) => x.id === arg);
+        return uiConfirm(t('¿Quitar «{name}» de los stickers del equipo? Los que ya están en tableros se quedan.', { name: (s && s.name) || t('este sticker') }))
+          .then((ok) => ok && Store.api('DELETE', `api/stickers/${encodeURIComponent(arg)}`).then(loadTeamStickers).catch((e) => toast(e.message)));
+      }
       case 'sticker': {
         const at = pendingSticker;
         pendingSticker = null;
@@ -3402,6 +3464,9 @@
       if (b && b.tagName !== 'INPUT') act(b.dataset.act, b.dataset.arg, b);
     });
   }
+  pop.addEventListener('change', (e) => {
+    if (e.target.matches('[data-ts-upload]') && e.target.files.length) uploadTeamStickers([...e.target.files]);
+  });
   pop.addEventListener('input', (e) => {
     if (e.target.dataset.act === 'color-custom') setStyle(selectedId, 'color', e.target.value);
     if (e.target.dataset.act === 'shape-color-custom') setItem(selItem, { color: e.target.value });

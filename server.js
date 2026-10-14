@@ -278,6 +278,29 @@ async function api(req, res, url, user) {
     }
     if (id && m === 'DELETE') { foldersRev = st.removeFolder(id).rev; broadcast('folders', { rev: foldersRev }); return send(res, 200, { rev: foldersRev }); }
   }
+  // Stickers del equipo (versión de Wild): imágenes subidas por cualquiera (en media/) que todo el equipo puede poner en
+  // sus tableros. La lista vive en stickers.json; solo quien lo subió (o admin) lo quita.
+  if (kind === 'stickers') {
+    const file = path.join(store.dir, 'stickers.json');
+    const list = () => { try { return JSON.parse(fs.readFileSync(file, 'utf8')).stickers || []; } catch { return []; } };
+    const save = (l) => { Store.writeAtomic(file, JSON.stringify({ stickers: l }, null, 1)); broadcast('stickers', { at: Date.now() }); };
+    if (!id && m === 'GET') return send(res, 200, { stickers: list() });
+    if (!id && m === 'POST') {
+      const b = (await readJSON(req)) || {};
+      if (typeof b.mediaId !== 'string' || !store.hasMedia(b.mediaId)) return send(res, 400, { error: 'Upload the image first' });
+      const st = { id: crypto.randomUUID(), mediaId: b.mediaId, name: String(b.name || '').trim().slice(0, 60),
+        w: Math.max(1, Math.round(+b.w || 512)), h: Math.max(1, Math.round(+b.h || 512)), by: user ? user.id : null, createdAt: Date.now() };
+      save([...list(), st]);
+      return send(res, 200, st);
+    }
+    if (id && m === 'DELETE') {
+      const cur = list().find((x) => x.id === id);
+      if (!cur) return send(res, 404, { error: 'Not found' });
+      if (TEAM && cur.by && cur.by !== user.id && user.role !== 'admin') return send(res, 403, { error: 'Only who uploaded it can remove it' });
+      save(list().filter((x) => x.id !== id));
+      return send(res, 200, { ok: true });
+    }
+  }
   if (kind === 'media' && id) {
     if (m === 'GET') {
       const md = store.getMedia(id);
