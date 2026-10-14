@@ -654,6 +654,8 @@
     'Todavía no hay nadie más en el equipo. Cuando alguien entre, podrás compartir con esa persona.': 'There is nobody else in the team yet. When someone logs in, you can share with them.',
     'Carpeta compartida': 'Folder shared',
     'Recortar': 'Crop',
+    'No se pudo guardar «{name}»: {msg}': 'Could not save “{name}”: {msg}',
+    'no es una imagen válida': 'it is not a valid image',
     '{name} te asignó una tarea': '{name} assigned you a task',
     '{name} te mencionó en una tarea': '{name} mentioned you in a task',
     'Chat de «{name}»': '“{name}” chat',

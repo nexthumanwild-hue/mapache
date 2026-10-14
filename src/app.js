@@ -2314,9 +2314,9 @@
       try {
         if (f.type.startsWith('video/')) await addVideoFile(f, p);
         else {
-          const { src, w, h } = await imageFromFile(f);
+          const { blob, w, h } = await imageBlobFromFile(f);
           const dw = Math.min(480, w);
-          createItem('image', p, { mediaId: await storeImage(src), w: dw, h: (h * dw) / w });
+          createItem('image', p, { mediaId: storeBlob(blob), w: dw, h: (h * dw) / w });
         }
         i++;
       } catch (err) {
@@ -2325,13 +2325,37 @@
     }
   }
 
-  // Guarda una imagen (data URL) en el almacén «media» y devuelve su id.
-  async function storeImage(src) {
-    const blob = dataUrlToBlob(src);
+  // Guarda un archivo en el almacén «media» y devuelve su id al momento: se ve ya (blob local) y se guarda y se sube
+  // por detrás (Safari tarda en guardar archivos grandes en el navegador).
+  function storeBlob(blob, name = t('imagen')) {
     const id = uid();
-    await Store.media.put({ id, blob, type: blob.type, name: t('imagen') });
     mediaURL(id, blob);
+    Store.media.put({ id, blob, type: blob.type, name }).catch((err) => uiAlert(t('No se pudo guardar «{name}»: {msg}', { name, msg: err.message })));
     return id;
+  }
+
+  // Imagen lista para el tablero, como archivo: los GIF tal cual (para que sigan animados); el resto, reducido a
+  // 1600 px en WebP. Safari no sabe hacer WebP: entonces JPEG, o PNG si la imagen era PNG (puede tener transparencia).
+  async function imageBlobFromFile(file, max = 1600) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      img.src = url;
+      await new Promise((ok, ko) => { img.onload = ok; img.onerror = () => ko(new Error(t('no es una imagen válida'))); });
+      const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+      if (file.type === 'image/gif' || file.type === 'image/svg+xml') return { blob: file, w: img.naturalWidth, h: img.naturalHeight };
+      const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      const as = (type, q) => new Promise((ok) => c.toBlob(ok, type, q));
+      let blob = await as('image/webp', 0.86);
+      if (!blob || blob.type !== 'image/webp') blob = file.type === 'image/png' ? await as('image/png') : await as('image/jpeg', 0.86);
+      // Si la original ya pesaba menos (y cabe), se queda la original.
+      if (scale === 1 && file.size < blob.size) blob = file;
+      return { blob, w, h };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
 
   // Vídeos subidos: el archivo va al almacén «media» y el objeto solo guarda su id.
@@ -2362,7 +2386,8 @@
     const id = uid();
     const url = mediaURL(id, f);
     const [vw, vh] = await videoSize(url);
-    await Store.media.put({ id, blob: f, type: f.type, name: f.name });
+    // Se ve al momento; se guarda en el navegador y se sube por detrás.
+    Store.media.put({ id, blob: f, type: f.type, name: f.name }).catch((err) => uiAlert(t('No se pudo guardar «{name}»: {msg}', { name: f.name, msg: err.message })));
     const w = Math.min(560, vw);
     createItem('video', at, { mediaId: id, w, h: Math.round((w * vh) / vw), name: f.name });
   }
@@ -3976,6 +4001,9 @@
     }
 
     const itemEl = e.target.closest('.mm-item');
+    // Un vídeo seleccionado solo recibe el puntero en su barra de controles (lo demás lo tapa .video-grip): Safari no se
+    // queda el gesto como Chrome, así que aquí no se empieza a arrastrar el objeto y se deja la barra para el vídeo.
+    if (e.target.tagName === 'VIDEO' && e.target.controls) return;
     // Tablas: clic en una celda la selecciona (otro clic la edita); el borde de la columna cambia su ancho.
     if (itemEl && e.button === 0 && doc.items[itemEl.dataset.item]?.type === 'table') {
       const id = itemEl.dataset.item;
