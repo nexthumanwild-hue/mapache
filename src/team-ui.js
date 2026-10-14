@@ -18,6 +18,8 @@
   // El servidor responde en inglés; en español se traducen los mensajes que puede ver una persona.
   const ERR_ES = {
     'Wrong email or password': 'Email o contraseña incorrectos',
+    'Wrong password': 'Contraseña incorrecta',
+    'Write your name': 'Escribe tu nombre',
     'Too many attempts. Wait a few minutes and try again': 'Demasiados intentos. Espera unos minutos y vuelve a probar',
     'The setup code is not right. It is printed in the server log': 'El código de configuración no es correcto. Aparece en el registro del servidor',
     'This Mapache already has an admin. Log in instead': 'Este Mapache ya tiene admin. Entra con tu cuenta',
@@ -49,7 +51,7 @@
     if (invite) {
       try { inv = await Store.api('GET', `api/auth/invite/${encodeURIComponent(invite)}`); } catch (e) { inv = { error: e.message }; }
     }
-    const view = invite && inv && !inv.error ? 'accept' : st.needsSetup ? 'setup' : 'login';
+    const view = st.shared ? 'shared' : invite && inv && !inv.error ? 'accept' : st.needsSetup ? 'setup' : 'login';
     const field = (name, label, type = 'text', extra = '') => `<label class="au-field"><span>${esc(label)}</span><input name="${name}" type="${type}" ${extra} required></label>`;
     let body;
     if (view === 'setup') {
@@ -59,6 +61,12 @@
         field('name', t('Tu nombre'), 'text', 'autocomplete="name"') + field('email', t('Email'), 'email', 'autocomplete="email"') +
         field('password', t('Contraseña (8 caracteres o más)'), 'password', 'autocomplete="new-password" minlength="8"') +
         `<button class="primary au-go" type="submit">${esc(t('Crear cuenta y entrar'))}</button>`;
+    } else if (view === 'shared') {
+      body = `<h1>${esc(t('Entra en Mapache'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Escribe tu nombre y la contraseña del equipo.'))}</p>` +
+        field('name', t('Tu nombre'), 'text', 'autocomplete="name"') +
+        field('password', t('Contraseña del equipo'), 'password', 'autocomplete="current-password"') +
+        `<button class="primary au-go" type="submit">${esc(t('Entrar'))}</button>` +
+        `<p class="au-hint">${esc(t('Usa siempre el mismo nombre: así conservas tu color y tus tokens de agente.'))}</p>`;
     } else if (view === 'accept') {
       body = `<h1>${esc(t('Te han invitado a Mapache'))}</h1><p class="au-sub">${esc(t('Crea tu cuenta para entrar en los tableros del equipo.'))} <span class="au-role">${esc(ROLE()[inv.role] || inv.role)}</span></p>` +
         field('name', t('Tu nombre'), 'text', 'autocomplete="name"') +
@@ -85,7 +93,8 @@
       go.disabled = true;
       err.hidden = true;
       try {
-        if (view === 'setup') await Store.api('POST', 'api/auth/setup', data);
+        if (view === 'shared') await Store.api('POST', 'api/auth/shared', data);
+        else if (view === 'setup') await Store.api('POST', 'api/auth/setup', data);
         else if (view === 'accept') await Store.api('POST', 'api/auth/accept', { ...data, token: invite });
         else await Store.api('POST', 'api/auth/login', data);
         history.replaceState(null, '', location.pathname);

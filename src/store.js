@@ -395,7 +395,7 @@
     persist: () => (navigator.storage && navigator.storage.persist ? navigator.storage.persist() : Promise.resolve(false)),
     ready,
     on: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
-    status: () => ({ mode, dataDir: info && info.dataDir, version: info && info.version, team, user, role: user ? user.role : null, url: info && info.url, needsSetup: !!(info && info.needsSetup), cid }),
+    status: () => ({ mode, dataDir: info && info.dataDir, version: info && info.version, team, user, role: user ? user.role : null, url: info && info.url, needsSetup: !!(info && info.needsSetup), shared: !!(info && info.shared), cid }),
     reportOpen,
     members: () => members,
     people: () => people,

@@ -15,7 +15,9 @@ const Launch = require('./lib/launch');
 const { version } = require('./package.json');
 
 const PORT = Number(process.env.PORT) || 4321;
-const TEAM = process.env.MAPACHE_MODE === 'team' || process.argv.includes('--team');
+// Contraseña común (versión de Wild): sin cuentas ni invitaciones, cada persona entra con su nombre y la misma contraseña.
+const SHARED = String(process.env.MAPACHE_SHARED_PASSWORD || '');
+const TEAM = !!SHARED || process.env.MAPACHE_MODE === 'team' || process.argv.includes('--team');
 const HOST = process.env.HOST || (TEAM ? '0.0.0.0' : '127.0.0.1');
 const PUBLIC_URL = String(process.env.PUBLIC_URL || '').replace(/\/+$/, '');
 const TRUST_PROXY = process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true';
@@ -181,7 +183,7 @@ let team = null;
 let auth = null;
 if (TEAM) {
   auth = require('./lib/auth').open(store.dir);
-  team = require('./lib/team').makeTeam({ auth, send, readJSON, origin: shareOrigin, secure, onTeamChange: () => broadcast('team', { at: Date.now() }), onSignOut: signOut });
+  team = require('./lib/team').makeTeam({ auth, shared: SHARED, send, readJSON, origin: shareOrigin, secure, onTeamChange: () => broadcast('team', { at: Date.now() }), onSignOut: signOut });
   // Primera cuenta sin pasar por la web (útil en Docker): MAPACHE_ADMIN_EMAIL y MAPACHE_ADMIN_PASSWORD.
   if (auth.needsSetup() && process.env.MAPACHE_ADMIN_EMAIL && process.env.MAPACHE_ADMIN_PASSWORD) {
     try { auth.createUser({ email: process.env.MAPACHE_ADMIN_EMAIL, name: process.env.MAPACHE_ADMIN_NAME, password: process.env.MAPACHE_ADMIN_PASSWORD, role: 'admin' }); } catch (e) { console.error(e.message); }
@@ -332,7 +334,7 @@ async function api(req, res, url, user) {
 function info(req, user) {
   const base = { app: 'mapache', version, mode: TEAM ? 'team' : 'local' };
   if (!TEAM) return { ...base, dataDir: store.dir, pid: process.pid, port: PORT, appDir: __dirname, node: process.execPath, bin: path.join(__dirname, 'bin', 'mapache.js') };
-  const out = { ...base, user: user || null, needsSetup: auth.needsSetup(), url: origin(req) };
+  const out = { ...base, user: user || null, needsSetup: !SHARED && auth.needsSetup(), shared: !!SHARED, url: origin(req) };
   if (user && user.role === 'admin') Object.assign(out, { dataDir: store.dir, port: PORT });
   return out;
 }
@@ -419,6 +421,7 @@ server.listen(PORT, HOST, () => {
   Store.writeAtomic(path.join(store.dir, 'server.json'), JSON.stringify({ pid: process.pid, port: PORT, version, mode: TEAM ? 'team' : 'local', startedAt: Date.now() }));
   watch();
   if (TEAM) {
+    if (SHARED) console.log(say('Acceso con contraseña común (MAPACHE_SHARED_PASSWORD)', 'Shared-password access (MAPACHE_SHARED_PASSWORD)'));
     console.log(say(`Mapache (modo equipo) en ${PUBLIC_URL || `http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`}`, `Mapache (team mode) is running at ${PUBLIC_URL || `http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`}`));
     if (team.setupCode()) console.log(say(`Código para crear la cuenta de admin: ${team.setupCode()}`, `Setup code to create the admin account: ${team.setupCode()}`));
     const lan = Store.lanAddress();
