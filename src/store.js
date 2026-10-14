@@ -97,7 +97,7 @@
     const m = await idb.maps.get(id);
     const s = await idb.sync.get(key);
     if (!m || (s && !s.dirty)) return;
-    const res = await call('PUT', `api/boards/${encodeURIComponent(id)}`, { board: m, baseRev: s && s.rev != null ? s.rev : null });
+    const res = await call('PUT', `api/boards/${encodeURIComponent(id)}`, { board: m, baseRev: s && s.rev != null ? s.rev : null }, {}, { long: true });
     if (res.ok) {
       const { rev } = await res.json();
       await idb.sync.put({ key, rev, base: m, dirty: false });
@@ -131,7 +131,7 @@
     const s = await idb.sync.get(key);
     if (s && s.dirty) return pushBoard(id); // hay cambios propios: al subirlos se fusionan
     if (!s || s.rev !== rev) {
-      const res = await call('GET', `api/boards/${encodeURIComponent(id)}`);
+      const res = await call('GET', `api/boards/${encodeURIComponent(id)}`, undefined, {}, { long: true });
       if (res.status === 404) return dropLocal(id);
       if (!res.ok) return;
       const b = await res.json();

@@ -1622,7 +1622,16 @@
       } else if (it.type === 'image') {
         s.width = `${it.w}px`;
         const img = rec.el.querySelector('img');
-        if (img.getAttribute('src') !== it.src) img.src = it.src;
+        if (it.mediaId) {
+          const u = mediaURLs.get(it.mediaId);
+          if (u) { if (img.getAttribute('src') !== u) img.src = u; }
+          else if (rec.imgFor !== it.mediaId) {
+            rec.imgFor = it.mediaId;
+            loadMedia(it.mediaId).then((url) => { if (url && rec.imgFor === it.mediaId) { mediaURLs.set(it.mediaId, url); img.src = url; } });
+            // Si acaba de subirla otra persona y aún no ha llegado al servidor, se reintenta.
+            img.onerror = () => { if (/^api\/media\//.test(img.getAttribute('src') || '') && (rec.imgTries = (rec.imgTries || 0) + 1) < 6) setTimeout(() => { img.src = `${img.getAttribute('src').split('?')[0]}?r=${rec.imgTries}`; }, 3000); };
+          }
+        } else if (img.getAttribute('src') !== it.src) img.src = it.src;
         // Recorte (versión de Wild): proporción fija y encuadre (cx, cy en %), sin tocar la imagen original.
         const r = cropRatio(it.crop);
         img.style.aspectRatio = r ? `${r[0]} / ${r[1]}` : '';
@@ -2195,7 +2204,12 @@
     } else if (type === 'video') {
       it = { ...base, w: extra.w || 560, h: extra.h || 315, mediaId: extra.mediaId || null, url: extra.url || null, embed: extra.embed || null, name: extra.name || '' };
       if (extra.sticker) Object.assign(it, { sticker: true, loop: true });
-    } else it = { ...base, w: extra.w, src: extra.src };
+    } else {
+      // Imagen: el archivo va aparte (almacén «media», como los vídeos) y el tablero solo guarda su id; así el tablero
+      // pesa poco y cada imagen se descarga una sola vez. Las antiguas, con la imagen dentro (src), siguen valiendo.
+      it = { ...base, w: extra.w };
+      if (extra.mediaId) it.mediaId = extra.mediaId; else it.src = extra.src;
+    }
     if (extra.center !== false) {
       const w = it.w || (type === 'sticker' ? it.size + 8 : 120);
       const h = it.h && type !== 'note' ? it.h : type === 'note' ? 220 : type === 'image' ? extra.h || 0 : type === 'sticker' ? it.size + 8 : 30;
@@ -2302,13 +2316,22 @@
         else {
           const { src, w, h } = await imageFromFile(f);
           const dw = Math.min(480, w);
-          createItem('image', p, { src, w: dw, h: (h * dw) / w });
+          createItem('image', p, { mediaId: await storeImage(src), w: dw, h: (h * dw) / w });
         }
         i++;
       } catch (err) {
         uiAlert(t('No se pudo añadir «{name}»: {msg}', { name: f.name, msg: err.message }));
       }
     }
+  }
+
+  // Guarda una imagen (data URL) en el almacén «media» y devuelve su id.
+  async function storeImage(src) {
+    const blob = dataUrlToBlob(src);
+    const id = uid();
+    await Store.media.put({ id, blob, type: blob.type, name: t('imagen') });
+    mediaURL(id, blob);
+    return id;
   }
 
   // Vídeos subidos: el archivo va al almacén «media» y el objeto solo guarda su id.
@@ -2320,7 +2343,7 @@
   async function loadMedia(id) {
     if (mediaURLs.has(id)) return mediaURLs.get(id);
     // Con servidor: si no está en este navegador, se ve en streaming desde el servidor (sin bajarlo entero antes).
-    if (Store.status().mode === 'online' && !(await Store.media.has(id))) return `api/media/${encodeURIComponent(id)}`;
+    if (Store.status().mode === 'online' && !(await Store.media.has(id))) { const u = `api/media/${encodeURIComponent(id)}`; mediaURLs.set(id, u); return u; }
     const m = await Store.media.get(id);
     return m ? mediaURL(id, m.blob) : null;
   }
@@ -3295,10 +3318,8 @@
     s.used = (s.used || 0) + 1;
     Store.api('POST', `api/stickers/${encodeURIComponent(id)}/use`, {}).catch(() => {});
     if (s.kind === 'video') return createItem('video', at, { mediaId: s.mediaId, w: 180, h: Math.round((s.h * 180) / s.w), sticker: true, name: s.name });
-    const blob = await (await fetch(`api/media/${encodeURIComponent(s.mediaId)}`)).blob();
-    const src = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
     const w = 180;
-    createItem('image', at, { src, w, h: Math.round((s.h * w) / s.w) });
+    createItem('image', at, { mediaId: s.mediaId, w, h: Math.round((s.h * w) / s.w) });
   }
 
   // Palabras clave de un icono: en inglés van primero las inglesas (las españolas también encuentran).
@@ -3509,6 +3530,7 @@
       case 'item-download': {
         const it = doc.items[selItem];
         if (it && it.type === 'video' && it.mediaId) { Store.media.get(it.mediaId).then((m) => { if (m) download(m.name || 'video.mp4', m.blob); }); return; }
+        if (it && it.type === 'image' && it.mediaId) { Store.media.get(it.mediaId).then((m) => { if (m) download(`${t('imagen')}.${(m.type || 'image/png').split('/')[1]}`, m.blob); }); return; }
         if (it && it.src) download(`${t('imagen')}.${it.src.slice(11, it.src.indexOf(';')) || 'png'}`, dataUrlToBlob(it.src));
         return;
       }
@@ -4761,7 +4783,7 @@
     const media = {};
     for (const m of all) {
       for (const it of Object.values(m.doc.items || {})) {
-        if (it.type !== 'video' || !it.mediaId || media[it.mediaId]) continue;
+        if ((it.type !== 'video' && it.type !== 'image') || !it.mediaId || media[it.mediaId]) continue;
         const rec = await Store.media.get(it.mediaId);
         if (rec) media[it.mediaId] = { type: rec.type, name: rec.name, data: await blobToDataURL(rec.blob) };
       }
@@ -4799,7 +4821,15 @@
     const ox = pad - b.x, oy = pad - b.y;
     // XMLSerializer da XHTML válido (<br/>, <img/>…); outerHTML rompería el SVG.
     const xs = new XMLSerializer();
-    const html = (layer) => [...layer.children].map((el) => xs.serializeToString(el)).join('');
+    // Las imágenes que están aparte (api/media/… o blob:) se meten dentro, para que el SVG se dibuje completo.
+    const inline = new Map();
+    for (const it of Object.values(doc.items || {})) {
+      const url = it.type === 'image' && it.mediaId && mediaURLs.get(it.mediaId);
+      if (!url || inline.has(url)) continue;
+      try { const m = await Store.media.get(it.mediaId); if (m) inline.set(url, await blobToDataURL(m.blob)); } catch { /* sin conexión: se queda sin esa imagen */ }
+    }
+    const withData = (h) => (inline.size ? h.replace(/src="([^"]+)"/g, (all, s) => { const k = s.replace(/&amp;/g, '&'); return inline.has(k) ? `src="${inline.get(k)}"` : all; }) : h);
+    const html = (layer) => withData([...layer.children].map((el) => xs.serializeToString(el)).join(''));
     const fo = (content) => `<foreignObject x="0" y="0" width="${w}" height="${h}"><div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:${w}px;height:${h}px">` +
       `<style><![CDATA[${cssText}]]></style><div style="position:absolute;left:${ox}px;top:${oy}px">${content}</div></div></foreignObject>`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
