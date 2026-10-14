@@ -20,7 +20,7 @@
     'Importados {maps} mapa(s) y {folders} carpeta(s)': 'Imported {maps} map(s) and {folders} folder(s)',
     'No se pudo importar: {msg}': 'Couldn’t import: {msg}',
     'No se pudo crear la imagen ({msg}). Prueba a exportar en SVG.': 'Couldn’t create the image ({msg}). Try exporting as SVG.',
-    'Hay una versión nueva de Mapache': 'A new version of Mapache is available',
+    'Hay una versión nueva de NOMIROR': 'A new version of NOMIROR is available',
     'Recargar': 'Reload',
 
     // ---------- Contenido que crea la app ----------
@@ -594,12 +594,12 @@
     '· Formación y sistemas de IA para negocio real': '· AI training and systems for real businesses',
     'Código de Mapache': 'Mapache source code',
     '¿Te gusta? Dale una estrella en GitHub': 'Like it? Give it a star on GitHub',
-    'Mapache · mapas mentales y pizarra de código abierto': 'Mapache · open-source mind maps and whiteboard',
+    'NOMIROR · basado en Mapache, mapas mentales y pizarra de código abierto': 'NOMIROR · based on Mapache, open-source mind maps and whiteboard',
 
     // ---------- Sincronización con los archivos ----------
     'Este tablero se ha movido a la papelera desde fuera de la app': 'This board was moved to the trash from outside the app',
     'Tus tableros se guardan en {dir}': 'Your boards are saved in {dir}',
-    'Sin conexión con Mapache: se guarda en este navegador y se sincroniza al volver': 'Not connected to Mapache: saving in this browser, it syncs when it is back',
+    'Sin conexión con NOMIROR: se guarda en este navegador y se sincroniza al volver': 'Not connected to NOMIROR: saving in this browser, it syncs when it is back',
     'Se guarda en este navegador': 'Saved in this browser',
 
     // ---------- Conectar tu agente de IA ----------
@@ -611,8 +611,8 @@
     'La forma fácil': 'The easy way',
     'Copia esto y pégaselo a tu agente:': 'Copy this and paste it into your agent:',
     'O conéctalo tú': 'Or connect it yourself',
-    'Conecta Mapache contigo como servidor MCP. Está instalado en {dir}. Sigue la sección «Connect Mapache to your AI agent» de {guide}. Cuando esté conectado, dime cómo usarlo.':
-      'Connect Mapache to yourself as an MCP server. It is installed in {dir}. Follow the "Connect Mapache to your AI agent" section of {guide}. When it is connected, tell me how to use it.',
+    'Conecta NOMIROR contigo como servidor MCP. Está instalado en {dir}. Sigue la sección «Connect Mapache to your AI agent» de {guide}. Cuando esté conectado, dime cómo usarlo.':
+      'Connect NOMIROR to yourself as an MCP server. It is installed in {dir}. Follow the "Connect Mapache to your AI agent" section of {guide}. When it is connected, tell me how to use it.',
     'Ejecútalo en una terminal y abre una conversación nueva de Claude Code.': 'Run it in a terminal, then start a new Claude Code conversation.',
     'En Claude Desktop: Ajustes > Desarrollador > Editar configuración. Añade esto a claude_desktop_config.json y reinicia Claude.':
       'In Claude Desktop: Settings > Developer > Edit config. Add this to claude_desktop_config.json and restart Claude.',
@@ -621,28 +621,28 @@
     'Añádelo a ~/.cursor/mcp.json (o en Cursor: Ajustes > MCP).': 'Add it to ~/.cursor/mcp.json (or in Cursor: Settings > MCP).',
     'En VS Code: paleta de comandos > «MCP: Open User Configuration», y pega esto.': 'In VS Code: Command Palette > "MCP: Open User Configuration", and paste this.',
     'Ejecútalo en una terminal y abre una sesión nueva.': 'Run it in a terminal, then start a new session.',
-    'ChatGPT en la web o el móvil no llega solo a tu ordenador. Usa Codex, o conecta ChatGPT con tu ordenador mediante Desktop Commander y pídele que use la línea de comandos de Mapache (esta orden muestra la ayuda).':
-      'ChatGPT on the web or phone cannot reach your computer by itself. Use Codex, or connect ChatGPT to your computer with Desktop Commander and ask it to use the Mapache command line (this command shows its help).',
+    'ChatGPT en la web o el móvil no llega solo a tu ordenador. Usa Codex, o conecta ChatGPT con tu ordenador mediante Desktop Commander y pídele que use la línea de comandos de NOMIROR (esta orden muestra la ayuda).':
+      'ChatGPT on the web or phone cannot reach your computer by itself. Use Codex, or connect ChatGPT to your computer with Desktop Commander and ask it to use the NOMIROR command line (this command shows its help).',
     'Tus tableros se guardan en {dir}. Tu agente usa esos mismos archivos.': 'Your boards are saved in {dir}. Your agent uses the same files.',
-    'Ahora Mapache no está en marcha en este ordenador. Ábrelo con «Abrir Mapache» (o npm start) para que tu agente y esta pestaña compartan los tableros.':
-      'Mapache is not running on this computer right now. Open it with "Abrir Mapache" (or npm start) so your agent and this tab share the same boards.',
+    'Ahora NOMIROR no está en marcha en este ordenador. Ábrelo con «Abrir NOMIROR» (o npm start) para que tu agente y esta pestaña compartan los tableros.':
+      'NOMIROR is not running on this computer right now. Open it with "Abrir NOMIROR" (or npm start) so your agent and this tab share the same boards.',
     // ---------- Modo equipo ----------
     'Solo puedes ver este tablero': 'You can only view this board',
     'Admin': 'Admin',
     'Puede editar': 'Can edit',
     'Solo ver': 'Can view',
     'Crea la cuenta de admin': 'Create the admin account',
-    'Es la primera vez que se abre este Mapache de equipo. Quien crea esta cuenta lo administra.': 'This is the first time this team Mapache is opened. Whoever creates this account manages it.',
+    'Es la primera vez que se abre este NOMIROR de equipo. Quien crea esta cuenta lo administra.': 'This is the first time this team NOMIROR is opened. Whoever creates this account manages it.',
     'Código de configuración': 'Setup code',
     'Aparece en el registro del servidor al arrancar (en Docker: docker logs mapache).': 'It is printed in the server log when it starts (with Docker: docker logs mapache).',
     'Tu nombre': 'Your name',
     'Email': 'Email',
     'Contraseña (8 caracteres o más)': 'Password (8 characters or more)',
     'Crear cuenta y entrar': 'Create account and log in',
-    'Te han invitado a Mapache': 'You are invited to Mapache',
+    'Te han invitado a NOMIROR': 'You are invited to NOMIROR',
     'Crea tu cuenta para entrar en los tableros del equipo.': 'Create your account to open the team’s boards.',
     'Ya tengo cuenta': 'I already have an account',
-    'Entra en Mapache': 'Log in to Mapache',
+    'Entra en NOMIROR': 'Log in to NOMIROR',
     'Escribe tu nombre y la contraseña del equipo.': 'Write your name and the team password.',
     'Contraseña del equipo': 'Team password',
     'Usa siempre el mismo nombre: así conservas tu color y tus tokens de agente.': 'Always use the same name: you keep your colour and your agent tokens.',
@@ -686,8 +686,8 @@
     'Añádelo al archivo de configuración de Codex y abre una sesión nueva.': 'Add it to the Codex config file, then start a new session.',
     'Claude Desktop usa servidores locales: este puente (mcp-remote, necesita Node.js) conecta con el de tu equipo. Añádelo a claude_desktop_config.json y reinicia Claude.':
       'Claude Desktop uses local servers: this bridge (mcp-remote, needs Node.js) connects to your team’s. Add it to claude_desktop_config.json and restart Claude.',
-    'Conecta Mapache contigo como servidor MCP por HTTP: la dirección es {url} y cada petición lleva la cabecera «Authorization: Bearer {token}». Si hace falta, sigue la sección «Connect Mapache to your AI agent» de https://github.com/Hackeatutiempo/mapache/blob/main/AGENTS.md. Cuando esté conectado, dime cómo usarlo.':
-      'Connect Mapache to yourself as an HTTP MCP server: the address is {url} and every request carries the header "Authorization: Bearer {token}". If needed, follow the "Connect Mapache to your AI agent" section of https://github.com/Hackeatutiempo/mapache/blob/main/AGENTS.md. When it is connected, tell me how to use it.',
+    'Conecta NOMIROR contigo como servidor MCP por HTTP: la dirección es {url} y cada petición lleva la cabecera «Authorization: Bearer {token}». Si hace falta, sigue la sección «Connect Mapache to your AI agent» de https://github.com/Hackeatutiempo/mapache/blob/main/AGENTS.md. Cuando esté conectado, dime cómo usarlo.':
+      'Connect NOMIROR to yourself as an HTTP MCP server: the address is {url} and every request carries the header "Authorization: Bearer {token}". If needed, follow the "Connect Mapache to your AI agent" section of https://github.com/Hackeatutiempo/mapache/blob/main/AGENTS.md. When it is connected, tell me how to use it.',
     'Tus tokens para agentes': 'Your agent tokens',
     'Crear un token': 'Create a token',
     'Cópialo ahora: es la única vez que se muestra. Ya está puesto en el texto y en las órdenes de arriba.': 'Copy it now: this is the only time it is shown. It is already in the text and commands above.',

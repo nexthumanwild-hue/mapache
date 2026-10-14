@@ -45,7 +45,7 @@ function htmlStrings() {
   return [...new Set(out.filter(Boolean))];
 }
 // Nombres propios, marcas y combinaciones de teclas: iguales en los dos idiomas.
-const NEUTRAL = new Set(['Mapache', 'Cristian', 'Hackea Tu Tiempo', 'Web', 'Instagram', 'hackeatutiempo.com', '@hackeatutiempo',
+const NEUTRAL = new Set(['Mapache', 'NOMIROR', 'Cristian', 'Hackea Tu Tiempo', 'Web', 'Instagram', 'hackeatutiempo.com', '@hackeatutiempo',
   'github.com/Hackeatutiempo/mapache', '(AGPL-3.0)', 'Zoom', '100%']);
 const isKeys = (s) => !/[A-Za-zÁÉÍÓÚáéíóúñ]{2,}/.test(s.replace(/\b(Ctrl|Shift|Alt|Enter|Tab|Esc)\b/g, ''));
 

@@ -343,7 +343,7 @@
     const s = Store.status();
     const el = $('#save-state');
     el.title = s.mode === 'online' ? t('Tus tableros se guardan en {dir}', { dir: s.dataDir || '~/.mapache' })
-      : s.mode === 'offline' ? t('Sin conexión con Mapache: se guarda en este navegador y se sincroniza al volver')
+      : s.mode === 'offline' ? t('Sin conexión con NOMIROR: se guarda en este navegador y se sincroniza al volver')
         : t('Se guarda en este navegador');
     el.classList.toggle('offline', s.mode === 'offline');
   }
@@ -4667,7 +4667,7 @@
     obj(4, `<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`, jpeg, '\nendstream');
     const content = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
     obj(5, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
-    obj(6, `<< /Title ${str(title)} /Producer (Mapache) /Creator (Mapache) >>`);
+    obj(6, `<< /Title ${str(title)} /Producer (NOMIROR) /Creator (NOMIROR) >>`);
     const xref = len;
     push(`xref\n0 7\n0000000000 65535 f \n${offs.slice(1).map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`);
     push(`trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
@@ -4689,7 +4689,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="Mapache">
+<meta name="generator" content="NOMIROR">
 <title>${esc(title)}</title>
 <style>
 html, body { margin: 0; height: 100%; overflow: hidden; background: ${THEME_COLORS[theme].bg}; }
@@ -4892,7 +4892,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: ${THEME_COLO
         t('En VS Code: paleta de comandos > «MCP: Open User Configuration», y pega esto.')],
       ['gemini', 'Gemini CLI', `gemini mcp add mapache ${q(node)} ${q(bin)} mcp`, t('Ejecútalo en una terminal y abre una sesión nueva.')],
       ['chatgpt', 'ChatGPT', `${q(node)} ${q(bin)} help`,
-        t('ChatGPT en la web o el móvil no llega solo a tu ordenador. Usa Codex, o conecta ChatGPT con tu ordenador mediante Desktop Commander y pídele que use la línea de comandos de Mapache (esta orden muestra la ayuda).')],
+        t('ChatGPT en la web o el móvil no llega solo a tu ordenador. Usa Codex, o conecta ChatGPT con tu ordenador mediante Desktop Commander y pídele que use la línea de comandos de NOMIROR (esta orden muestra la ayuda).')],
     ];
     const cur = tabs.find((x) => x[0] === agentTab) || tabs[0];
     $('#agent-tabs').innerHTML = tabs.map(([k, name]) => `<button role="tab" data-agent-tab="${k}" aria-selected="${k === cur[0]}">${esc(name)}</button>`).join('');
@@ -4900,12 +4900,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: ${THEME_COLO
     $('#agent-hint').textContent = cur[3];
     const dir = info && info.appDir ? info.appDir : '~/Mapache';
     const guide = info && info.appDir ? `${info.appDir}${info.appDir.includes('\\') ? '\\' : '/'}AGENTS.md` : `${REPO_URL}/blob/main/AGENTS.md`;
-    $('#agent-prompt').textContent = t('Conecta Mapache contigo como servidor MCP. Está instalado en {dir}. Sigue la sección «Connect Mapache to your AI agent» de {guide}. Cuando esté conectado, dime cómo usarlo.', { dir, guide });
+    $('#agent-prompt').textContent = t('Conecta NOMIROR contigo como servidor MCP. Está instalado en {dir}. Sigue la sección «Connect Mapache to your AI agent» de {guide}. Cuando esté conectado, dime cómo usarlo.', { dir, guide });
     const where = $('#agent-where');
     const s = Store.status();
     where.classList.toggle('warn', s.mode !== 'online');
     where.textContent = s.mode === 'online' ? t('Tus tableros se guardan en {dir}. Tu agente usa esos mismos archivos.', { dir: s.dataDir })
-      : t('Ahora Mapache no está en marcha en este ordenador. Ábrelo con «Abrir Mapache» (o npm start) para que tu agente y esta pestaña compartan los tableros.');
+      : t('Ahora NOMIROR no está en marcha en este ordenador. Ábrelo con «Abrir NOMIROR» (o npm start) para que tu agente y esta pestaña compartan los tableros.');
   }
   agentBox.addEventListener('click', async (e) => {
     if (e.target === agentBox) return toggleAgent();

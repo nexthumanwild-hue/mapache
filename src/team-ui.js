@@ -22,7 +22,7 @@
     'Write your name': 'Escribe tu nombre',
     'Too many attempts. Wait a few minutes and try again': 'Demasiados intentos. Espera unos minutos y vuelve a probar',
     'The setup code is not right. It is printed in the server log': 'El código de configuración no es correcto. Aparece en el registro del servidor',
-    'This Mapache already has an admin. Log in instead': 'Este Mapache ya tiene admin. Entra con tu cuenta',
+    'This NOMIROR already has an admin. Log in instead': 'Este NOMIROR ya tiene admin. Entra con tu cuenta',
     'This invitation link is not valid any more. Ask for a new one': 'Este enlace de invitación ya no vale. Pide uno nuevo',
     'This invitation is for another email address': 'Esta invitación es para otro email',
     'There is already an account with that email': 'Ya hay una cuenta con ese email',
@@ -55,33 +55,33 @@
     const field = (name, label, type = 'text', extra = '') => `<label class="au-field"><span>${esc(label)}</span><input name="${name}" type="${type}" ${extra} required></label>`;
     let body;
     if (view === 'setup') {
-      body = `<h1>${esc(t('Crea la cuenta de admin'))}</h1><p class="au-sub">${esc(t('Es la primera vez que se abre este Mapache de equipo. Quien crea esta cuenta lo administra.'))}</p>` +
+      body = `<h1>${esc(t('Crea la cuenta de admin'))}</h1><p class="au-sub">${esc(t('Es la primera vez que se abre este NOMIROR de equipo. Quien crea esta cuenta lo administra.'))}</p>` +
         field('code', t('Código de configuración'), 'text', 'inputmode="numeric" autocomplete="one-time-code"') +
         `<p class="au-hint">${esc(t('Aparece en el registro del servidor al arrancar (en Docker: docker logs mapache).'))}</p>` +
         field('name', t('Tu nombre'), 'text', 'autocomplete="name"') + field('email', t('Email'), 'email', 'autocomplete="email"') +
         field('password', t('Contraseña (8 caracteres o más)'), 'password', 'autocomplete="new-password" minlength="8"') +
         `<button class="primary au-go" type="submit">${esc(t('Crear cuenta y entrar'))}</button>`;
     } else if (view === 'shared') {
-      body = `<h1>${esc(t('Entra en Mapache'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Escribe tu nombre y la contraseña del equipo.'))}</p>` +
+      body = `<h1>${esc(t('Entra en NOMIROR'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Escribe tu nombre y la contraseña del equipo.'))}</p>` +
         field('name', t('Tu nombre'), 'text', 'autocomplete="name"') +
         field('password', t('Contraseña del equipo'), 'password', 'autocomplete="current-password"') +
         `<button class="primary au-go" type="submit">${esc(t('Entrar'))}</button>` +
         `<p class="au-hint">${esc(t('Usa siempre el mismo nombre: así conservas tu color y tus tokens de agente.'))}</p>`;
     } else if (view === 'accept') {
-      body = `<h1>${esc(t('Te han invitado a Mapache'))}</h1><p class="au-sub">${esc(t('Crea tu cuenta para entrar en los tableros del equipo.'))} <span class="au-role">${esc(ROLE()[inv.role] || inv.role)}</span></p>` +
+      body = `<h1>${esc(t('Te han invitado a NOMIROR'))}</h1><p class="au-sub">${esc(t('Crea tu cuenta para entrar en los tableros del equipo.'))} <span class="au-role">${esc(ROLE()[inv.role] || inv.role)}</span></p>` +
         field('name', t('Tu nombre'), 'text', 'autocomplete="name"') +
         field('email', t('Email'), 'email', `autocomplete="email"${inv.email ? ` value="${esc(inv.email)}" readonly` : ''}`) +
         field('password', t('Contraseña (8 caracteres o más)'), 'password', 'autocomplete="new-password" minlength="8"') +
         `<button class="primary au-go" type="submit">${esc(t('Crear cuenta y entrar'))}</button>` +
         `<p class="au-alt"><a href="#" data-au="login">${esc(t('Ya tengo cuenta'))}</a></p>`;
     } else {
-      body = `<h1>${esc(t('Entra en Mapache'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Los tableros de tu equipo, en vuestro propio servidor.'))}</p>` +
+      body = `<h1>${esc(t('Entra en NOMIROR'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Los tableros de tu equipo, en vuestro propio servidor.'))}</p>` +
         (invite && inv && inv.error ? `<p class="au-error">${esc(t('Este enlace de invitación ya no vale. Pide uno nuevo a quien administra el equipo.'))}</p>` : '') +
         field('email', t('Email'), 'email', 'autocomplete="email"') + field('password', t('Contraseña'), 'password', 'autocomplete="current-password"') +
         `<button class="primary au-go" type="submit">${esc(t('Entrar'))}</button>` +
         `<p class="au-hint">${esc(t('¿Has olvidado la contraseña? Quien administra el equipo puede darte una nueva.'))}</p>`;
     }
-    box.innerHTML = `<form class="au-card" novalidate><div class="au-brand"><img src="icon.svg" alt="" width="34" height="34"><b>Mapache</b></div>${body}<p class="au-error" hidden></p></form>`;
+    box.innerHTML = `<form class="au-card" novalidate><div class="au-brand"><img src="icon.svg" alt="" width="34" height="34"><b>NOMIROR</b></div>${body}<p class="au-error" hidden></p></form>`;
     const form = box.querySelector('form');
     const err = form.querySelector('.au-error[hidden]');
     form.querySelector('input:not([readonly])').focus();
@@ -299,7 +299,7 @@
     box.querySelector('#agent-tabs').innerHTML = tabs.map(([k, name]) => `<button role="tab" data-team-tab="${k}" aria-selected="${k === cur[0]}">${esc(name)}</button>`).join('');
     box.querySelector('#agent-snippet').textContent = cur[2];
     box.querySelector('#agent-hint').textContent = cur[3];
-    box.querySelector('#agent-prompt').textContent = t('Conecta Mapache contigo como servidor MCP por HTTP: la dirección es {url} y cada petición lleva la cabecera «Authorization: Bearer {token}». Si hace falta, sigue la sección «Connect Mapache to your AI agent» de https://github.com/Hackeatutiempo/mapache/blob/main/AGENTS.md. Cuando esté conectado, dime cómo usarlo.', { url, token: tok });
+    box.querySelector('#agent-prompt').textContent = t('Conecta NOMIROR contigo como servidor MCP por HTTP: la dirección es {url} y cada petición lleva la cabecera «Authorization: Bearer {token}». Si hace falta, sigue la sección «Connect Mapache to your AI agent» de https://github.com/Hackeatutiempo/mapache/blob/main/AGENTS.md. Cuando esté conectado, dime cómo usarlo.', { url, token: tok });
     let list = [];
     try { list = (await Store.api('GET', 'api/me/tokens')).tokens; } catch { /* sin conexión */ }
     const where = box.querySelector('#agent-where');
