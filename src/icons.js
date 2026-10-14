@@ -64,6 +64,7 @@
     paste: svg('<rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3h6v2"/>'),
     sidebar: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>'),
     download: svg('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'),
+    crop: svg('<path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/>'),
     upload: svg('<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>'),
     map: svg('<circle cx="6" cy="12" r="2"/><path d="M8 12c4 0 4-5 8-5M8 12c4 0 4 5 8 5"/><circle cx="18" cy="7" r="1.5"/><circle cx="18" cy="17" r="1.5"/>'),
     check: svg('<path d="M5 12l5 5L20 7"/>'),

@@ -19,6 +19,8 @@
   const ERR_ES = {
     'Wrong email or password': 'Email o contraseña incorrectos',
     'Wrong password': 'Contraseña incorrecta',
+    'Wrong name or password': 'Nombre o contraseña incorrectos',
+    'That name is taken. Log in or choose another one': 'Ese nombre ya existe. Entra con él o elige otro',
     'Write your name': 'Escribe tu nombre',
     'Only the owner can share this folder': 'Solo quien la creó puede compartir esta carpeta',
     'Only the owner can delete this folder': 'Solo quien la creó puede borrar esta carpeta',
@@ -46,7 +48,7 @@
 
   // ---------- Pantalla de acceso ----------
 
-  async function showAuth({ expired = false } = {}) {
+  async function showAuth({ expired = false, register = false } = {}) {
     const box = $('#auth');
     if (!box) return;
     document.body.classList.add('auth-open');
@@ -57,7 +59,7 @@
     if (invite) {
       try { inv = await Store.api('GET', `api/auth/invite/${encodeURIComponent(invite)}`); } catch (e) { inv = { error: e.message }; }
     }
-    const view = st.shared ? 'shared' : invite && inv && !inv.error ? 'accept' : st.needsSetup ? 'setup' : 'login';
+    const view = st.shared ? (register ? 'register' : 'shared') : invite && inv && !inv.error ? 'accept' : st.needsSetup ? 'setup' : 'login';
     const field = (name, label, type = 'text', extra = '') => `<label class="au-field"><span>${esc(label)}</span><input name="${name}" type="${type}" ${extra} required></label>`;
     let body;
     if (view === 'setup') {
@@ -68,11 +70,17 @@
         field('password', t('Contraseña (8 caracteres o más)'), 'password', 'autocomplete="new-password" minlength="8"') +
         `<button class="primary au-go" type="submit">${esc(t('Crear cuenta y entrar'))}</button>`;
     } else if (view === 'shared') {
-      body = `<h1>${esc(t('Entra en NOMIROR'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Escribe tu nombre y tu contraseña. Si es tu primera vez, usa la del equipo.'))}</p>` +
-        field('name', t('Tu nombre'), 'text', 'autocomplete="name"') +
+      body = `<h1>${esc(t('Entra en NOMIROR'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Escribe tu nombre y tu contraseña.'))}</p>` +
+        field('name', t('Tu nombre'), 'text', 'autocomplete="username"') +
         field('password', t('Contraseña'), 'password', 'autocomplete="current-password"') +
         `<button class="primary au-go" type="submit">${esc(t('Entrar'))}</button>` +
-        `<p class="au-hint">${esc(t('Después, ponte tu propia contraseña en Tu perfil: así nadie más puede entrar en tu espacio.'))}</p>`;
+        `<p class="au-alt"><a href="#" data-au="register">${esc(t('¿No tienes usuario? Crea uno'))}</a></p>`;
+    } else if (view === 'register') {
+      body = `<h1>${esc(t('Crea tu usuario'))}</h1><p class="au-sub">${esc(t('Tendrás tu propio espacio privado. Luego podrás compartir carpetas con quien quieras.'))}</p>` +
+        field('name', t('Tu nombre'), 'text', 'autocomplete="username"') +
+        field('password', t('Contraseña (8 caracteres o más)'), 'password', 'autocomplete="new-password" minlength="8"') +
+        `<button class="primary au-go" type="submit">${esc(t('Crear usuario y entrar'))}</button>` +
+        `<p class="au-alt"><a href="#" data-au="login">${esc(t('Ya tengo usuario'))}</a></p>`;
     } else if (view === 'accept') {
       body = `<h1>${esc(t('Te han invitado a NOMIROR'))}</h1><p class="au-sub">${esc(t('Crea tu cuenta para entrar en los tableros del equipo.'))} <span class="au-role">${esc(ROLE()[inv.role] || inv.role)}</span></p>` +
         field('name', t('Tu nombre'), 'text', 'autocomplete="name"') +
@@ -92,6 +100,7 @@
     const err = form.querySelector('.au-error[hidden]');
     form.querySelector('input:not([readonly])').focus();
     box.querySelector('[data-au="login"]')?.addEventListener('click', (e) => { e.preventDefault(); history.replaceState(null, '', location.pathname); showAuth(); });
+    box.querySelector('[data-au="register"]')?.addEventListener('click', (e) => { e.preventDefault(); showAuth({ register: true }); });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(form));
@@ -99,7 +108,7 @@
       go.disabled = true;
       err.hidden = true;
       try {
-        if (view === 'shared') await Store.api('POST', 'api/auth/shared', data);
+        if (view === 'shared' || view === 'register') await Store.api('POST', 'api/auth/shared', { ...data, create: view === 'register' });
         else if (view === 'setup') await Store.api('POST', 'api/auth/setup', data);
         else if (view === 'accept') await Store.api('POST', 'api/auth/accept', { ...data, token: invite });
         else await Store.api('POST', 'api/auth/login', data);

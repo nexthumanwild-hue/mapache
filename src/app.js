@@ -1622,6 +1622,11 @@
         s.width = `${it.w}px`;
         const img = rec.el.querySelector('img');
         if (img.getAttribute('src') !== it.src) img.src = it.src;
+        // Recorte (versión de Wild): proporción fija y encuadre (cx, cy en %), sin tocar la imagen original.
+        const r = cropRatio(it.crop);
+        img.style.aspectRatio = r ? `${r[0]} / ${r[1]}` : '';
+        img.style.objectFit = r ? 'cover' : '';
+        img.style.objectPosition = r ? `${it.cx ?? 50}% ${it.cy ?? 50}%` : '';
       } else if (it.type === 'video') {
         s.width = `${it.w}px`;
         s.height = `${it.h}px`;
@@ -2220,6 +2225,11 @@
     doc.items[id].h = it.h;
     render();
   }
+
+  // Recortes de imagen: proporción → [ancho, alto].
+  const CROPS = [['1:1', t('Cuadrado')], ['4:5', t('Vertical (Instagram)')], ['9:16', t('Story / Reel')], ['3:4', t('Vertical')],
+    ['2:3', t('Vertical (foto)')], ['16:9', t('Horizontal (vídeo)')], ['4:3', t('Horizontal')], ['3:2', t('Horizontal (foto)')]];
+  const cropRatio = (c) => { const m = /^(\d+):(\d+)$/.exec(c || ''); return m ? [+m[1], +m[2]] : null; };
 
   function setItem(id, patch) {
     mutate(() => Object.assign(doc.items[id], patch));
@@ -2862,7 +2872,7 @@
     } else if (it.type === 'sticker') {
       parts.push(btn('menu-sticker', `<span style="font-size:18px">${it.emoji}</span>`, t('Cambiar sticker'), { menu: true }));
     } else if (it.type === 'image') {
-      parts.push(btn('item-download', UI.download, t('Descargar imagen')));
+      parts.push(btn('menu-crop', UI.crop, t('Recortar'), { menu: true, on: !!it.crop }), btn('item-download', UI.download, t('Descargar imagen')));
     } else if (it.type === 'video') {
       if (!it.embed) parts.push(btn('video-loop', UI.loop, t('Repetir en bucle'), { on: !!it.loop }));
       if (it.mediaId) parts.push(btn('item-download', UI.download, t('Descargar vídeo')));
@@ -3024,6 +3034,10 @@
         item('wrap-section', t('Meter el mapa en una sección')) +
         item('export-png', t('Exportar mapa como PNG')) + item('export-svg', t('Exportar mapa como SVG')) +
         (root ? '' : `<div class="menu-sep"></div>${item('delete', t('Borrar'), t('Supr'))}`);
+    } else if (kind === 'menu-crop') {
+      html = item('img-crop', t('Original'), '', '', !it.crop) + '<div class="menu-sep"></div>' +
+        CROPS.map(([r, label]) => item('img-crop', `${r} <span class="menu-count">${label}</span>`, '', r, it.crop === r)).join('') +
+        (it.crop ? `<div class="menu-hint">${t('Para elegir qué parte se ve, arrastra la imagen con Alt pulsado.')}</div>` : '');
     } else if (kind === 'menu-item-more') {
       html = item('item-front', t('Traer al frente')) + item('item-back', t('Enviar detrás del mapa')) + item('item-dup', t('Duplicar'), 'Ctrl D') +
         item('wrap-section', t('Meter en sección')) + item('item-lock', t('Bloquear'), 'Shift L') + '<div class="menu-sep"></div>' + item('item-del', t('Borrar'), t('Supr'));
@@ -3206,6 +3220,7 @@
       case 'lang': closePopover(); return setLangPref(arg);
       case 'media-file': closePopover(); return $('#image-file').click();
       case 'link-remove': closePopover(); restoreLinkRange(); return inlineFormat('unlink');
+      case 'img-crop': closePopover(); return setItem(selItem, { crop: arg || null, cx: 50, cy: 50 });
       case 'video-loop': return setItem(selItem, { loop: !doc.items[selItem].loop });
       case 'video-open': { const it = doc.items[selItem]; const src = it.embed || it.url; if (src) window.open(src, '_blank', 'noopener'); return; }
       case 'text-align': closePopover(); return setItem(selItem, { align: arg });
@@ -3828,6 +3843,9 @@
       const before = snapshot();
       if (e.target.closest('.rz')) {
         drag = { kind: 'resize', id, sx: e.clientX, sy: e.clientY, before, start: { ...it, ow: itemEls.get(id).el.offsetWidth, oh: itemEls.get(id).el.offsetHeight } };
+      } else if (e.altKey && it.type === 'image' && it.crop && !it.locked) {
+        // Alt + arrastrar una imagen recortada: cambia qué parte se ve.
+        drag = { kind: 'crop-pan', id, sx: e.clientX, sy: e.clientY, before, cx: it.cx ?? 50, cy: it.cy ?? 50 };
       } else {
         drag = { kind: 'item', id, sx: e.clientX, sy: e.clientY, before, ox: it.x, oy: it.y, clickEdit: wasSelected, point: { x: e.clientX, y: e.clientY } };
       }
@@ -4044,6 +4062,19 @@
       gUI.innerHTML = guideLines().join('');
       return;
     }
+    if (drag.kind === 'crop-pan') {
+      const it = doc.items[drag.id], img = itemEls.get(drag.id)?.el.querySelector('img');
+      if (!it || !img || !img.naturalWidth) return;
+      drag.moving = true;
+      const bw = img.offsetWidth, bh = img.offsetHeight;
+      const k = Math.max(bw / img.naturalWidth, bh / img.naturalHeight);
+      const overX = img.naturalWidth * k - bw, overY = img.naturalHeight * k - bh;
+      const clamp = (v) => Math.max(0, Math.min(100, Math.round(v * 10) / 10));
+      if (overX > 0.5) it.cx = clamp(drag.cx - ((dx / view.k) / overX) * 100);
+      if (overY > 0.5) it.cy = clamp(drag.cy - ((dy / view.k) / overY) * 100);
+      renderItems();
+      return;
+    }
     if (drag.kind === 'resize') {
       const it = doc.items[drag.id], s = drag.start;
       if (it.locked) return;
@@ -4153,6 +4184,7 @@
       selCell = d.cell;
       return render();
     }
+    if (d.kind === 'crop-pan') { if (d.moving) commit(d.before); return render(); }
     if (d.kind === 'item' || d.kind === 'resize') {
       if (d.moving) { commit(d.before); return render(); }
       const it = doc.items[d.id];
