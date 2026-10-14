@@ -2319,6 +2319,8 @@
   }
   async function loadMedia(id) {
     if (mediaURLs.has(id)) return mediaURLs.get(id);
+    // Con servidor: si no está en este navegador, se ve en streaming desde el servidor (sin bajarlo entero antes).
+    if (Store.status().mode === 'online' && !(await Store.media.has(id))) return `api/media/${encodeURIComponent(id)}`;
     const m = await Store.media.get(id);
     return m ? mediaURL(id, m.blob) : null;
   }
@@ -2380,7 +2382,18 @@
         host.innerHTML = it.sticker ? '<video autoplay muted loop playsinline preload="auto"></video>' : '<video controls playsinline preload="metadata"></video><div class="video-grip"></div>';
         const v = host.querySelector('video');
         if (it.url) v.src = it.url;
-        else if (it.mediaId) loadMedia(it.mediaId).then((u) => { if (u) v.src = u; else host.innerHTML = `<div class="video-missing">${t('Este vídeo no está en este navegador')}</div><div class="video-grip"></div>`; });
+        else if (it.mediaId) {
+          // Mientras carga, «Cargando…»; si falla, un botón para reintentar (y se reintenta solo al volver la conexión).
+          const fail = () => {
+            host.innerHTML = `<div class="video-missing">${t('No se pudo cargar el vídeo')}<button class="ghost video-retry">${t('Reintentar')}</button></div><div class="video-grip"></div>`;
+            rec.videoSig = null;
+            host.querySelector('.video-retry').onclick = (e) => { e.stopPropagation(); rec.videoSig = null; drawVideo(rec, it); };
+          };
+          host.insertAdjacentHTML('afterbegin', `<div class="video-loading">${t('Cargando vídeo…')}</div>`);
+          v.addEventListener('loadeddata', () => host.querySelector('.video-loading')?.remove(), { once: true });
+          v.addEventListener('error', fail, { once: true });
+          loadMedia(it.mediaId).then((u) => { if (u) v.src = u; else fail(); });
+        }
       }
     }
     rec.el.classList.toggle('is-embed', !!it.embed);

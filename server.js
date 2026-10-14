@@ -325,7 +325,18 @@ async function api(req, res, url, user) {
       if (!md) return send(res, 404, { error: 'Not found' });
       // Solo tipos de vídeo, audio o imagen: nada que el navegador pudiera ejecutar como página.
       const type = /^(video|audio|image)\/[\w.+-]+$/i.test(md.type || '') && !/svg/i.test(md.type) ? md.type : 'application/octet-stream';
-      res.writeHead(200, { 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'X-Media-Name': encodeURIComponent(md.name || ''), 'Cache-Control': 'private, max-age=31536000, immutable' });
+      const head = { 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'X-Media-Name': encodeURIComponent(md.name || ''), 'Cache-Control': 'private, max-age=31536000, immutable', 'Accept-Ranges': 'bytes' };
+      const size = fs.statSync(md.file).size;
+      // Por trozos (Range): el vídeo empieza a verse sin bajarlo entero, se puede saltar, y Safari/iPhone lo exigen.
+      const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ''));
+      if (range && (range[1] || range[2])) {
+        let start = range[1] ? +range[1] : Math.max(0, size - +range[2]);
+        let end = range[1] && range[2] ? Math.min(+range[2], size - 1) : size - 1;
+        if (start >= size || start > end) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
+        res.writeHead(206, { ...head, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 });
+        return fs.createReadStream(md.file, { start, end }).pipe(res);
+      }
+      res.writeHead(200, { ...head, 'Content-Length': size });
       return fs.createReadStream(md.file).pipe(res);
     }
     if (m === 'HEAD') { res.writeHead(store.hasMedia(id) ? 200 : 404); return res.end(); }

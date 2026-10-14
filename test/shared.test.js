@@ -94,6 +94,11 @@ test('stickers: groups, per-person uses and renaming a group', async () => {
   await req('PATCH', '/api/stickers', { body: { from: 'Wolf', to: 'El lobo' }, headers: h(leo) });
   assert.strictEqual((await req('GET', '/api/stickers', { headers: h(leo) })).json.stickers[0].group, 'El lobo');
   assert.strictEqual((await req('DELETE', `/api/stickers/${st.id}`, { headers: h(leo) })).status, 403);
+  // Los vídeos se sirven por trozos (Range): así se ven en streaming y en Safari.
+  const part = await req('GET', '/api/media/st1', { headers: { ...h(leo), Range: 'bytes=0-1' } });
+  assert.strictEqual(part.status, 206);
+  assert.match(part.headers['content-range'], /^bytes 0-1\/\d+$/);
+  assert.strictEqual((await req('GET', '/api/media/st1', { headers: { ...h(leo), Range: 'bytes=999-' } })).status, 416);
 });
 
 test('shared: only failures count, per forwarded address', async () => {

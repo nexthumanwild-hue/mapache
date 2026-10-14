@@ -830,3 +830,5 @@ body.readonly #toolbox, body.readonly #contextbar, body.readonly .qa { display: 
 .ts-tab:hover { background: var(--btn-hover); }
 .ts-tab.on { background: var(--sel-bg); color: var(--accent-ink); border-color: transparent; }
 .dialog-input { display: block; width: 100%; margin-top: 12px; }
+.video-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #cbd5e1; font-size: 13px; pointer-events: none; }
+.video-missing .video-retry { margin-top: 8px; pointer-events: auto; }

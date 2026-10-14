@@ -70,9 +70,10 @@
   }
   const strip = (b) => { if (!b) return b; const { rev, ...rest } = b; return rest; };
 
-  async function call(method, url, body, headers = {}) {
+  async function call(method, url, body, headers = {}, { long = false } = {}) {
     const isBlob = typeof Blob !== 'undefined' && body instanceof Blob;
-    const opts = { method, cache: 'no-store', headers: { ...headers }, signal: AbortSignal.timeout(isBlob ? 600000 : 15000) };
+    // Subir o bajar un vídeo puede tardar: 10 minutos; lo demás, 15 segundos.
+    const opts = { method, cache: 'no-store', headers: { ...headers }, signal: AbortSignal.timeout(isBlob || long ? 600000 : 15000) };
     if (body !== undefined) {
       if (isBlob) opts.body = body;
       else { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
@@ -384,7 +385,7 @@
         const rec = await idb.media.get(id);
         if (rec || mode !== 'online') return rec;
         try {
-          const res = await call('GET', `api/media/${encodeURIComponent(id)}`);
+          const res = await call('GET', `api/media/${encodeURIComponent(id)}`, undefined, {}, { long: true });
           if (!res.ok) return undefined;
           const blob = await res.blob();
           const got = { id, blob, type: blob.type, name: decodeURIComponent(res.headers.get('x-media-name') || '') };
@@ -398,6 +399,7 @@
         if (mode === 'online') serial(`m:${rec.id}`, () => uploadMedia(rec)).catch(() => {});
       },
       remove: (id) => idb.media.remove(id),
+      has: async (id) => !!(await idb.media.get(id)),
     },
     // Pide al navegador que no borre estos datos al liberar espacio.
     persist: () => (navigator.storage && navigator.storage.persist ? navigator.storage.persist() : Promise.resolve(false)),
