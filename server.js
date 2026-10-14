@@ -284,12 +284,30 @@ async function api(req, res, url, user) {
     const file = path.join(store.dir, 'stickers.json');
     const list = () => { try { return JSON.parse(fs.readFileSync(file, 'utf8')).stickers || []; } catch { return []; } };
     const save = (l) => { Store.writeAtomic(file, JSON.stringify({ stickers: l }, null, 1)); broadcast('stickers', { at: Date.now() }); };
-    if (!id && m === 'GET') return send(res, 200, { stickers: list() });
+    // Cada sticker: grupo (pack) y cuántas veces lo ha usado cada persona; a cada una se le devuelven solo sus usos.
+    const me = user ? user.id : 'local';
+    if (!id && m === 'GET') return send(res, 200, { stickers: list().map(({ uses, ...s }) => ({ ...s, group: s.group || 'Varios', used: (uses && uses[me]) || 0 })) });
+    if (id && parts[2] === 'use' && m === 'POST') {
+      const l = list();
+      const s = l.find((x) => x.id === id);
+      if (!s) return send(res, 404, { error: 'Not found' });
+      s.uses = { ...(s.uses || {}), [me]: ((s.uses && s.uses[me]) || 0) + 1 };
+      Store.writeAtomic(file, JSON.stringify({ stickers: l }, null, 1));
+      return send(res, 200, { used: s.uses[me] });
+    }
+    // Renombrar un grupo, o pasar un sticker a otro grupo: { from, to } o { id, to }.
+    if (!id && m === 'PATCH') {
+      const b = (await readJSON(req)) || {};
+      const to = String(b.to || '').trim().slice(0, 40);
+      if (!to) return send(res, 400, { error: 'Write a group name' });
+      save(list().map((s) => ((b.id ? s.id === b.id : (s.group || 'Varios') === b.from) ? { ...s, group: to } : s)));
+      return send(res, 200, { ok: true });
+    }
     if (!id && m === 'POST') {
       const b = (await readJSON(req)) || {};
       if (typeof b.mediaId !== 'string' || !store.hasMedia(b.mediaId)) return send(res, 400, { error: 'Upload the image first' });
-      const st = { id: crypto.randomUUID(), mediaId: b.mediaId, name: String(b.name || '').trim().slice(0, 60),
-        w: Math.max(1, Math.round(+b.w || 512)), h: Math.max(1, Math.round(+b.h || 512)), kind: b.kind === 'video' ? 'video' : 'image', by: user ? user.id : null, createdAt: Date.now() };
+      const st = { id: crypto.randomUUID(), mediaId: b.mediaId, name: String(b.name || '').trim().slice(0, 60), group: String(b.group || '').trim().slice(0, 40) || 'Varios',
+        w: Math.max(1, Math.round(+b.w || 512)), h: Math.max(1, Math.round(+b.h || 512)), kind: b.kind === 'video' ? 'video' : 'image', thumb: typeof b.thumb === 'string' && store.hasMedia(b.thumb) ? b.thumb : null, by: user ? user.id : null, createdAt: Date.now() };
       save([...list(), st]);
       return send(res, 200, st);
     }

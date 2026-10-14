@@ -824,3 +824,9 @@ body.readonly #toolbox, body.readonly #contextbar, body.readonly .qa { display: 
 .ts-cell video { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .mm-item.video.is-sticker .video-host { background: none; box-shadow: none; }
 .mm-item.video.is-sticker video { object-fit: contain; background: none; pointer-events: none !important; }
+.ts-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: thin; }
+.ts-tab { flex: none; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.ts-tab small { opacity: .7; margin-left: 2px; }
+.ts-tab:hover { background: var(--btn-hover); }
+.ts-tab.on { background: var(--sel-bg); color: var(--accent-ink); border-color: transparent; }
+.dialog-input { display: block; width: 100%; margin-top: 12px; }

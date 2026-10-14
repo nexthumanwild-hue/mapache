@@ -80,6 +80,22 @@ test('shared: each person changes their own password', async () => {
   assert.strictEqual((await enter({ name: 'Leo', password: 'leo-nueva-22' }, '10.0.0.3')).status, 200);
 });
 
+test('stickers: groups, per-person uses and renaming a group', async () => {
+  const ana = await enter({ name: 'Ana López', password: 'ana-propia-1' });
+  const leo = await enter({ name: 'Leo', password: 'leo-nueva-22' });
+  const h = (r) => ({ Cookie: cookieOf(r), Origin: ORIGIN });
+  assert.strictEqual((await req('PUT', '/api/media/st1', { body: 'x', headers: { ...h(ana), 'Content-Type': 'image/png' } })).status, 200);
+  const st = (await req('POST', '/api/stickers', { body: { mediaId: 'st1', name: 'Uno', group: 'Wolf' }, headers: h(ana) })).json;
+  assert.strictEqual(st.group, 'Wolf');
+  await req('POST', `/api/stickers/${st.id}/use`, { body: {}, headers: h(ana) });
+  await req('POST', `/api/stickers/${st.id}/use`, { body: {}, headers: h(ana) });
+  assert.strictEqual((await req('GET', '/api/stickers', { headers: h(ana) })).json.stickers[0].used, 2);
+  assert.strictEqual((await req('GET', '/api/stickers', { headers: h(leo) })).json.stickers[0].used, 0);
+  await req('PATCH', '/api/stickers', { body: { from: 'Wolf', to: 'El lobo' }, headers: h(leo) });
+  assert.strictEqual((await req('GET', '/api/stickers', { headers: h(leo) })).json.stickers[0].group, 'El lobo');
+  assert.strictEqual((await req('DELETE', `/api/stickers/${st.id}`, { headers: h(leo) })).status, 403);
+});
+
 test('shared: only failures count, per forwarded address', async () => {
   for (let i = 0; i < 20; i++) assert.strictEqual((await enter({ name: 'Leo', password: 'mal' }, '10.9.9.9')).status, 401);
   assert.strictEqual((await enter({ name: 'Leo', password: 'leo-nueva-22' }, '10.9.9.9')).status, 429);

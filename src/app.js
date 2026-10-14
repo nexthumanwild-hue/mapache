@@ -3210,27 +3210,43 @@
     const ts = pop.querySelector('.team-stickers');
     if (ts) ts.innerHTML = teamStickerGrid(pop.querySelector('.icon-search')?.value || '');
   }
+  // Grupos (packs) en pestañas; «Favoritos» son los que más usas tú. Buscar mira en todos los grupos.
+  let tsTab = null;
+  const FAV = '__fav__';
   function teamStickerGrid(q) {
     const term = q.trim().toLowerCase();
     const me = Store.status().user;
-    const hits = teamStickers.filter((s) => !term || (s.name || '').toLowerCase().includes(term));
+    const groups = [...new Set(teamStickers.map((s) => s.group || 'Varios'))].sort((a, b) => a.localeCompare(b, 'es'));
+    const favs = teamStickers.filter((s) => s.used > 0).sort((a, b) => b.used - a.used || b.createdAt - a.createdAt).slice(0, 16);
+    if (!tsTab || (tsTab === FAV ? !favs.length : !groups.includes(tsTab))) tsTab = favs.length ? FAV : groups[0] || null;
+    const hits = term ? teamStickers.filter((s) => `${s.name || ''} ${s.group || ''}`.toLowerCase().includes(term))
+      : tsTab === FAV ? favs : teamStickers.filter((s) => (s.group || 'Varios') === tsTab);
+    const tabs = !term && teamStickers.length ? `<div class="ts-tabs">${favs.length ? `<button class="ts-tab${tsTab === FAV ? ' on' : ''}" data-act="ts-tab" data-arg="${FAV}">★ ${t('Favoritos')}</button>` : ''}` +
+      groups.map((g) => `<button class="ts-tab${tsTab === g ? ' on' : ''}" data-act="ts-tab" data-arg="${esc(g)}" data-tip="${t('Doble clic para renombrar el grupo')}">${esc(g)} <small>${teamStickers.filter((s) => (s.group || 'Varios') === g).length}</small></button>`).join('') + '</div>' : '';
     return `<div class="icon-cat">${t('Del equipo')}<label class="ts-add" data-tip="${t('Sube PNG, WebP, GIF, JPG o WebM animado (puedes elegir varios)')}">+ ${t('Subir')}<input type="file" accept="image/png,image/webp,image/gif,image/jpeg,video/webm,.webm" multiple hidden data-ts-upload></label></div>` +
-      (hits.length ? `<div class="ts-grid">${hits.map((s) => `<button class="ts-cell" data-act="team-sticker" data-arg="${s.id}" data-tip="${esc(s.name || '')}">` +
-        (s.kind === 'video' ? `<video src="api/media/${encodeURIComponent(s.mediaId)}#t=0.4" muted loop playsinline preload="metadata"></video>`
+      tabs + (hits.length ? `<div class="ts-grid">${hits.map((s) => `<button class="ts-cell" data-act="team-sticker" data-arg="${s.id}" data-tip="${esc(s.name || '')}">` +
+        (s.kind === 'video' ? (s.thumb ? `<img class="ts-thumb" src="api/media/${encodeURIComponent(s.thumb)}" alt="" loading="lazy" draggable="false" data-video="api/media/${encodeURIComponent(s.mediaId)}">`
+          : `<video src="api/media/${encodeURIComponent(s.mediaId)}" muted loop playsinline preload="auto"></video>`)
           : `<img src="api/media/${encodeURIComponent(s.mediaId)}" alt="" loading="lazy" draggable="false">`) +
         (!me || !s.by || s.by === me.id || me.role === 'admin' ? `<span class="ts-del" data-act="team-sticker-del" data-arg="${s.id}" title="${t('Quitar de los stickers del equipo')}">×</span>` : '') + '</button>').join('')}</div>`
         : `<div class="ts-empty">${term ? t('Sin resultados') : t('Todavía no hay stickers del equipo. Sube los vuestros con «+ Subir».')}</div>`);
   }
   async function uploadTeamStickers(files) {
+    const groups = [...new Set(teamStickers.map((s) => s.group || 'Varios'))];
+    const group = await uiPrompt(t('¿En qué grupo los guardo? Escribe uno que ya exista ({list}) o uno nuevo.', { list: groups.join(', ') || t('ninguno todavía') }),
+      { title: t('Grupo de stickers'), ok: t('Subir'), value: tsTab && tsTab !== FAV ? tsTab : 'Varios' });
+    if (group === null) return;
     let n = 0;
     for (const file of files) {
       const video = /^video\/webm$/.test(file.type) || /\.webm$/i.test(file.name);
       if (!video && !/^image\/(png|webp|gif|jpeg)$/.test(file.type)) { toast(t('{name}: ese formato no vale (usa PNG, WebP, GIF, JPG o WebM)', { name: file.name })); continue; }
       try {
         let blob, w, h;
+        let thumb = null;
         if (video) {
           blob = file.type ? file : new Blob([file], { type: 'video/webm' });
           [w, h] = await videoSize(URL.createObjectURL(blob));
+          thumb = await videoThumb(blob).catch(() => null);
         } else {
           const img = await imageFromFile(file, 512);
           ({ w, h } = img);
@@ -3239,16 +3255,32 @@
         const mediaId = uid();
         const r = await fetch(`api/media/${mediaId}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type, 'X-Media-Name': encodeURIComponent(file.name) } });
         if (!r.ok) throw new Error(String(r.status));
-        await Store.api('POST', 'api/stickers', { mediaId, w, h, kind: video ? 'video' : 'image', name: file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ') });
+        await Store.api('POST', 'api/stickers', { mediaId, w, h, kind: video ? 'video' : 'image', thumb, group: group || 'Varios', name: file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ') });
         n++;
       } catch (e) { toast(t('No se pudo subir {name}', { name: file.name })); }
     }
-    if (n) toast(t('{n} sticker(s) añadidos', { n }));
+    if (n) { toast(t('{n} sticker(s) añadidos', { n })); tsTab = group || 'Varios'; }
     loadTeamStickers();
+  }
+  // Miniatura de un sticker de vídeo: un fotograma pequeño, para que la lista no tenga que cargar cada vídeo.
+  async function videoThumb(blob) {
+    const v = Object.assign(document.createElement('video'), { muted: true, playsInline: true, preload: 'auto', src: URL.createObjectURL(blob) });
+    await new Promise((ok, ko) => { v.onloadeddata = ok; v.onerror = ko; });
+    v.currentTime = Math.min(0.3, (v.duration || 1) / 2);
+    await new Promise((ok) => { v.onseeked = ok; });
+    const k = 160 / Math.max(v.videoWidth, v.videoHeight);
+    const c = Object.assign(document.createElement('canvas'), { width: Math.round(v.videoWidth * k), height: Math.round(v.videoHeight * k) });
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    const png = await new Promise((ok) => c.toBlob(ok, 'image/webp', 0.8));
+    const id = uid();
+    const r = await fetch(`api/media/${id}`, { method: 'PUT', body: png, headers: { 'Content-Type': png.type, 'X-Media-Name': 'thumb' } });
+    return r.ok ? id : null;
   }
   async function placeTeamSticker(id, at) {
     const s = teamStickers.find((x) => x.id === id);
     if (!s) return;
+    s.used = (s.used || 0) + 1;
+    Store.api('POST', `api/stickers/${encodeURIComponent(id)}/use`, {}).catch(() => {});
     if (s.kind === 'video') return createItem('video', at, { mediaId: s.mediaId, w: 180, h: Math.round((s.h * 180) / s.w), sticker: true, name: s.name });
     const blob = await (await fetch(`api/media/${encodeURIComponent(s.mediaId)}`)).blob();
     const src = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
@@ -3311,6 +3343,12 @@
         pendingSticker = null;
         closePopover();
         return at && placeTeamSticker(arg, at);
+      }
+      case 'ts-tab': {
+        tsTab = arg;
+        const ts = pop.querySelector('.team-stickers');
+        if (ts) ts.innerHTML = teamStickerGrid('');
+        return;
       }
       case 'team-sticker-del': {
         const s = teamStickers.find((x) => x.id === arg);
@@ -3477,8 +3515,23 @@
       if (b && b.tagName !== 'INPUT') act(b.dataset.act, b.dataset.arg, b);
     });
   }
-  pop.addEventListener('mouseover', (e) => { const v = e.target.closest('.ts-cell')?.querySelector('video'); if (v) v.play().catch(() => {}); });
+  pop.addEventListener('mouseover', (e) => {
+    const cell = e.target.closest('.ts-cell');
+    if (!cell) return;
+    const th = cell.querySelector('.ts-thumb');
+    // Con miniatura: al pasar por encima se cambia por el vídeo, que se reproduce.
+    if (th) th.replaceWith(Object.assign(document.createElement('video'), { src: th.dataset.video, muted: true, loop: true, playsInline: true, autoplay: true }));
+    const v = cell.querySelector('video');
+    if (v) v.play().catch(() => {});
+  });
   pop.addEventListener('mouseout', (e) => { const v = e.target.closest('.ts-cell')?.querySelector('video'); if (v) v.pause(); });
+  pop.addEventListener('dblclick', async (e) => {
+    const b = e.target.closest('.ts-tab');
+    if (!b || b.dataset.arg === FAV) return;
+    const to = await uiPrompt(t('Nuevo nombre para el grupo «{name}»', { name: b.dataset.arg }), { title: t('Renombrar grupo'), ok: t('Guardar'), value: b.dataset.arg });
+    if (!to || to === b.dataset.arg) return;
+    try { await Store.api('PATCH', 'api/stickers', { from: b.dataset.arg, to }); tsTab = to; loadTeamStickers(); } catch (err) { toast(err.message); }
+  });
   pop.addEventListener('change', (e) => {
     if (e.target.matches('[data-ts-upload]') && e.target.files.length) uploadTeamStickers([...e.target.files]);
   });
@@ -4931,6 +4984,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: ${THEME_COLO
     });
   }
   const uiAlert = (msg, opts) => uiDialog(msg, opts);
+  // Pide un texto con el mismo diálogo; devuelve el texto o null si se cancela.
+  async function uiPrompt(msg, { value = '', ...opts } = {}) {
+    const box = dialogEl.querySelector('.dialog-msg');
+    const p = uiDialog(msg, { cancel: t('Cancelar'), ...opts });
+    const input = Object.assign(document.createElement('input'), { className: 'title-input dialog-input', value });
+    box.append(input);
+    input.focus();
+    input.select();
+    const ok = await p;
+    input.remove();
+    return ok ? input.value.trim() : null;
+  }
   const uiConfirm = (msg, opts = {}) => uiDialog(msg, { cancel: t('Cancelar'), ...opts });
 
   // ---------- Tema claro u oscuro ----------
