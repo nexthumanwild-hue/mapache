@@ -120,6 +120,13 @@ test('projects: chat for whoever sees the folder, tasks for whoever can edit it'
   assert.strictEqual(seen.tasks[0].assignee, leo.json.user.id);
   assert.strictEqual(seen.chat[0].text, 'Hola equipo');
   assert.strictEqual(seen.chat[0].name, 'Leo');
+  // @menciones y asignaciones llegan a la bandeja de quien toca (y no a quien las hace).
+  await req('POST', '/api/projects/pf/chat', { body: { text: '@Leo mira esto' }, headers: h(ana) });
+  await req('POST', '/api/projects/pf/tasks', { body: { title: 'Revisar copy con @leo' }, headers: h(ana) });
+  const kinds = (await req('GET', '/api/projects', { headers: h(leo) })).json.entries.map((x) => x.kind).sort();
+  assert.deepStrictEqual(kinds, ['assign', 'chat', 'task']);
+  assert.deepStrictEqual((await req('GET', '/api/projects', { headers: h(ana) })).json.entries, []);
+  assert.deepStrictEqual((await req('GET', '/api/projects', { headers: h(eva) })).json.entries, []);
   // Eva no tiene acceso a la carpeta: ni la ve.
   assert.strictEqual((await req('GET', '/api/projects/pf', { headers: h(eva) })).status, 404);
   assert.strictEqual((await req('POST', '/api/projects/pf/chat', { body: { text: 'x' }, headers: h(eva) })).status, 404);

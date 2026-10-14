@@ -85,6 +85,7 @@
   const replyDrafts = new Map(); // respuestas a medio escribir, por hilo
   const cache = new Map(); // tablero -> { id, title, doc: { comments } } (para la bandeja)
   let entries = [];
+  let extra = []; // menciones y asignaciones de los proyectos (chat y tareas), las trae project.js
 
   const doc = () => (api ? api.getDoc() : null);
   const allComments = () => Object.values((doc() && doc().comments) || {}).filter((c) => c && c.id);
@@ -747,7 +748,7 @@
   }
   function recount() {
     const me = currentUser();
-    entries = inbox([...cache.values()], me, { byName: !me.team && !!api.pref('mindmap:name') });
+    entries = [...inbox([...cache.values()], me, { byName: !me.team && !!api.pref('mindmap:name') }), ...extra].sort((a, b) => b.createdAt - a.createdAt);
     updateBell();
     if (!inboxEl.hidden) renderInbox();
   }
@@ -776,12 +777,23 @@
     const seen = seenSet();
     const me = currentUser();
     const unread = entries.some((x) => !seen.has(x.key));
-    const rows = entries.slice(0, 80).map((x) => `<button class="cm-irow${seen.has(x.key) ? '' : ' unread'}" data-cm="goto" data-board="${esc(x.boardId)}" data-arg="${esc(x.commentId)}" data-key="${esc(x.key)}">` +
+    const rows = entries.slice(0, 80).map((x) => (x.folderId ? projectRow(x, seen) : `<button class="cm-irow${seen.has(x.key) ? '' : ' unread'}" data-cm="goto" data-board="${esc(x.boardId)}" data-arg="${esc(x.commentId)}" data-key="${esc(x.key)}">` +
       `${avatar(x.author)}<span class="cm-rbody"><span class="cm-meta"><span class="cm-who">${t('{name} te mencionó', { name: `<b>${esc(x.author.name || '?')}</b>` })}</span><time>${esc(ago(x.createdAt))}</time></span>` +
-      `<span class="cm-rtext">${richText(x.text, { links: false })}</span><span class="cm-rfoot">${esc(x.title || t('Sin título'))}${x.resolved ? ` · ${t('Resuelto')}` : ''}</span></span></button>`).join('');
+      `<span class="cm-rtext">${richText(x.text, { links: false })}</span><span class="cm-rfoot">${esc(x.title || t('Sin título'))}${x.resolved ? ` · ${t('Resuelto')}` : ''}</span></span></button>`)).join('');
     inboxEl.innerHTML = `<div class="cm-ihead"><b>${t('Menciones')}</b>${unread ? `<button class="cm-link" data-cm="read-all">${t('Marcar todo como leído')}</button>` : ''}</div>` +
       (rows ? `<div class="cm-ilist">${rows}</div>` : `<div class="cm-empty">${UI.bell}<p>${t('No tienes menciones.')}</p><small>${t('Cuando alguien escriba @{name} en un comentario, aparecerá aquí.', { name: esc(me.name) })}</small></div>`);
   }
+
+  // Fila de la bandeja que viene de un proyecto: mención en el chat o en una tarea, o una tarea asignada.
+  function projectRow(x, seen) {
+    const who = `<b>${esc(x.author.name || '?')}</b>`;
+    const label = x.kind === 'assign' ? t('{name} te asignó una tarea', { name: who }) : x.kind === 'task' ? t('{name} te mencionó en una tarea', { name: who }) : t('{name} te mencionó', { name: who });
+    const where = x.kind === 'chat' ? t('Chat de «{name}»', { name: x.folderName }) : t('Tareas de «{name}»', { name: x.folderName });
+    return `<button class="cm-irow${seen.has(x.key) ? '' : ' unread'}" data-cm="goto-project" data-arg="${esc(x.folderId)}" data-key="${esc(x.key)}">` +
+      `${avatar(x.author)}<span class="cm-rbody"><span class="cm-meta"><span class="cm-who">${label}</span><time>${esc(ago(x.createdAt))}</time></span>` +
+      `<span class="cm-rtext">${richText(x.text, { links: false })}</span><span class="cm-rfoot">${esc(where)}</span></span></button>`;
+  }
+  function setExtra(list) { extra = Array.isArray(list) ? list : []; if (bBtn) recount(); }
 
   function toggleInbox(on = inboxEl.hidden) {
     inboxEl.hidden = !on;
@@ -821,6 +833,10 @@
       case 'goto':
         if (b.dataset.key) { markSeen([b.dataset.key]); toggleInbox(false); }
         return goto(b.dataset.board || boardId, arg);
+      case 'goto-project':
+        markSeen([b.dataset.key]);
+        toggleInbox(false);
+        return root.MMProject && root.MMProject.open(arg);
       case 'panel-close': return togglePanel(false);
       case 'show-resolved': return setShowResolved(true);
       case 'rename': return renameStart();
@@ -919,5 +935,6 @@
     get openId() { return openId; },
     get entries() { return entries; },
     scan: scanAll,
+    setExtra,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

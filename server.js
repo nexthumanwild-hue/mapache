@@ -196,7 +196,7 @@ const canWrite = (user) => !TEAM || (user && user.role !== 'viewer');
 // Espacios: en modo equipo cada persona ve su espacio y lo que le comparten (ver lib/spaces.js).
 const spaceOf = (user) => (TEAM && user ? Spaces.scope(store, user, { userById: (id) => auth.userById(id) }) : store);
 // Proyectos: chat y tareas de cada carpeta (ver lib/projects.js).
-const projects = makeProjects({ store, writeAtomic: Store.writeAtomic, userById: (id) => (auth ? auth.userById(id) : null) });
+const projects = makeProjects({ store, writeAtomic: Store.writeAtomic, userById: (id) => (auth ? auth.userById(id) : null), users: () => (auth ? auth.users() : []) });
 // Los avisos de un tablero solo llegan a quien puede verlo.
 const seesBoard = (id) => (c) => !TEAM || (!!c.user && !!Spaces.boardAccess(store.readFolders().folders, c.user, store.getBoard(id)));
 
@@ -323,6 +323,7 @@ async function api(req, res, url, user) {
       return send(res, 200, { ok: true });
     }
   }
+  if (kind === 'projects' && !id && m === 'GET') return send(res, 200, { entries: projects.inbox(TEAM ? user : null) });
   if (kind === 'projects' && id) {
     const body = m === 'GET' || m === 'DELETE' ? null : await readJSON(req);
     const out = projects.handle(m, parts, body, TEAM ? user : null);

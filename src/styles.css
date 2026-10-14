@@ -877,3 +877,5 @@ body.readonly #toolbox, body.readonly #contextbar, body.readonly .qa { display: 
 .pj-send { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--bar-border); align-items: flex-end; }
 .pj-send textarea { resize: none; max-height: 120px; }
 @media (max-width: 900px) { .pj-body { grid-template-columns: 1fr; grid-template-rows: 1fr 280px; } .pj-chat { border-left: 0; border-top: 1px solid var(--bar-border); } }
+.pj-suggest { position: fixed; z-index: 60; bottom: auto; right: auto; }
+.pj-task .cm-mention, .pj-bubble .cm-mention { font-weight: 600; }

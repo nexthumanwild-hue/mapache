@@ -10,6 +10,15 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
   const avatar = (u, size = 22) => `<span class="tm-avatar" style="--c:${esc((u && u.color) || '#94a3b8')};--s:${size}px" title="${esc((u && u.name) || '')}">${esc(initials(u && u.name))}</span>`;
+  // Texto con las @menciones de personas del equipo resaltadas.
+  const fold = (s) => String(s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function rich(text) {
+    const names = Store.members().map((m) => m.name).filter(Boolean).sort((a, b) => b.length - a.length).map(escRe);
+    const s = esc(text);
+    if (!names.length) return s;
+    return s.replace(new RegExp(`(?<![\\p{L}\\p{N}_])@(?:${names.map(esc).join('|')})(?![\\p{L}\\p{N}_])`, 'giu'), (m) => `<span class="cm-mention">${m}</span>`);
+  }
   const COLS = () => [['todo', t('Por hacer')], ['doing', t('En curso')], ['review', t('En revisión')], ['done', t('Hecho')]];
   const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16M5.5 8h1.5M11 8h2M17 8h1.5M11 11.5h2"/></svg>';
 
@@ -63,7 +72,7 @@
     el.innerHTML = `<div class="pj-card" role="dialog" aria-modal="true"><div class="pj-head"><h2>${esc(await folderName(id))}</h2>` +
       `<span class="pj-sub">${esc(t('Tareas y chat del proyecto'))}</span><button class="icon-btn pj-close" aria-label="${esc(t('Cerrar'))}">×</button></div>` +
       `<div class="pj-body"><div class="pj-board"></div><div class="pj-chat"><div class="pj-msgs"></div>` +
-      `<form class="pj-send"><textarea rows="1" placeholder="${esc(t('Escribe un mensaje…'))}"></textarea><button class="primary" type="submit">${esc(t('Enviar'))}</button></form></div></div></div>`;
+      `<form class="pj-send"><textarea rows="1" placeholder="${esc(t('Escribe un mensaje… (@ para etiquetar)'))}"></textarea><button class="primary" type="submit">${esc(t('Enviar'))}</button></form></div></div></div>`;
     el.querySelector('.pj-close').onclick = close;
     unread.delete(id);
     setFolder(folderId);
@@ -96,7 +105,7 @@
       const list = tasks.filter((x) => x.status === k);
       return `<section class="pj-col" data-status="${k}"><header><b>${esc(label)}</b><span>${list.length}</span></header><div class="pj-cards">` +
         list.map((x) => (editing === x.id ? editor(x) : card(x))).join('') + '</div>' +
-        (data.canEdit ? `<form class="pj-add" data-status="${k}"><input placeholder="+ ${esc(t('Añadir tarea'))}" maxlength="300"></form>` : '') + '</section>';
+        (data.canEdit ? `<form class="pj-add" data-status="${k}"><input placeholder="+ ${esc(t('Añadir tarea (@ para etiquetar)'))}" maxlength="300"></form>` : '') + '</section>';
     }).join('');
     const msgs = el.querySelector('.pj-msgs');
     const me = Store.status().user;
@@ -106,7 +115,7 @@
       const grouped = prev && prev.by === m.by && m.at - prev.at < 5 * 60000;
       const mine = me && m.by === me.id;
       return `<div class="pj-msg${mine ? ' mine' : ''}${grouped ? ' grouped' : ''}">${grouped || mine ? '' : avatar(m, 26)}<div class="pj-bubble">` +
-        (grouped || mine ? '' : `<b>${esc(m.name)}</b>`) + `<p>${esc(m.text)}</p><time>${new Date(m.at).toLocaleString(root.MMI18n.locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time></div></div>`;
+        (grouped || mine ? '' : `<b>${esc(m.name)}</b>`) + `<p>${rich(m.text)}</p><time>${new Date(m.at).toLocaleString(root.MMI18n.locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time></div></div>`;
     }).join('') : `<p class="pj-empty">${esc(t('Todavía no hay mensajes. Escribe el primero.'))}</p>`;
     if (atBottom || !msgs.dataset.ready) { msgs.scrollTop = msgs.scrollHeight; msgs.dataset.ready = '1'; }
     if (data.chat.length) setSeen(openId, data.chat[data.chat.length - 1].at);
@@ -115,8 +124,8 @@
 
   function card(x) {
     const a = x.assignee && person(x.assignee);
-    return `<article class="pj-task" data-id="${esc(x.id)}" draggable="${data.canEdit}"><p>${esc(x.title)}</p>` +
-      (x.note ? `<small class="pj-note">${esc(x.note)}</small>` : '') +
+    return `<article class="pj-task" data-id="${esc(x.id)}" draggable="${data.canEdit}"><p>${rich(x.title)}</p>` +
+      (x.note ? `<small class="pj-note">${rich(x.note)}</small>` : '') +
       `<footer>${a ? avatar(a, 20) : ''}<span>${esc(a ? a.name : '')}</span></footer></article>`;
   }
 
@@ -139,10 +148,21 @@
     // Lo que se escribe aquí no son atajos del tablero.
     el.addEventListener('keydown', (e) => {
       e.stopPropagation();
+      if (sugg) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sugg.i = (sugg.i + (e.key === 'ArrowDown' ? 1 : -1) + sugg.list.length) % sugg.list.length; return drawSuggest(); }
+        if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); return pick(sugg.i); }
+        if (e.key === 'Escape') { e.preventDefault(); return hideSuggest(); }
+      }
       if (e.key === 'Escape') { if (editing) { editing = null; draw(); } else close(); }
       if (e.key === 'Enter' && !e.shiftKey && e.target.matches('.pj-send textarea')) { e.preventDefault(); e.target.form.requestSubmit(); }
     });
-    el.addEventListener('pointerdown', (e) => { if (e.target === el) close(); });
+    el.addEventListener('pointerdown', (e) => {
+      const s = e.target.closest('.pj-sug');
+      if (s) { e.preventDefault(); return pick(+s.dataset.i); }
+      if (!e.target.closest('.pj-suggest')) hideSuggest();
+      if (e.target === el) close();
+    });
+    el.addEventListener('input', (e) => { if (e.target.matches('textarea, input')) suggest(e.target); });
     el.addEventListener('submit', (e) => {
       e.preventDefault();
       const f = e.target;
@@ -206,12 +226,58 @@
     });
   }
 
+  // ---------- @ para etiquetar (chat y tareas) ----------
+
+  let sugg = null; // { el, start, end, list, i }
+  function suggest(field) {
+    const before = field.value.slice(0, field.selectionStart);
+    const m = before.match(/(?:^|\s)@([^\s@]{0,30})$/u);
+    const me = Store.status().user;
+    const q = m ? fold(m[1]) : '';
+    const list = m ? Store.members().filter((x) => x && x.name && (!me || x.id !== me.id) && fold(x.name).includes(q))
+      .sort((a, b) => (fold(b.name).startsWith(q) ? 1 : 0) - (fold(a.name).startsWith(q) ? 1 : 0) || String(a.name).localeCompare(b.name)).slice(0, 6) : [];
+    if (!list.length) return hideSuggest();
+    sugg = { el: field, start: field.selectionStart - m[1].length - 1, end: field.selectionStart, list, i: 0 };
+    drawSuggest();
+  }
+  function drawSuggest() {
+    let b = box().querySelector('.pj-suggest');
+    if (!b) { b = document.createElement('div'); b.className = 'pj-suggest cm-suggest'; box().append(b); }
+    b.innerHTML = sugg.list.map((x, i) => `<button type="button" class="cm-sug pj-sug${i === sugg.i ? ' on' : ''}" data-i="${i}">${avatar(x, 22)}<span>${esc(x.name)}</span></button>`).join('');
+    const r = sugg.el.getBoundingClientRect();
+    const h = b.offsetHeight || 40 * sugg.list.length;
+    b.style.left = `${Math.round(r.left)}px`;
+    b.style.width = `${Math.round(Math.max(200, Math.min(r.width, 320)))}px`;
+    b.style.top = `${Math.round(r.top - h - 6 > 8 ? r.top - h - 6 : r.bottom + 6)}px`;
+  }
+  function hideSuggest() { sugg = null; box()?.querySelector('.pj-suggest')?.remove(); }
+  function pick(i) {
+    if (!sugg || !sugg.list[i]) return;
+    const f = sugg.el;
+    const insert = `@${sugg.list[i].name} `;
+    f.value = f.value.slice(0, sugg.start) + insert + f.value.slice(sugg.end);
+    const at = sugg.start + insert.length;
+    hideSuggest();
+    f.focus();
+    f.setSelectionRange(at, at);
+  }
+
+  // Bandeja (la campana): dónde te mencionan o te asignan tareas en los proyectos.
+  let inboxTimer = null;
+  async function refreshInbox() {
+    if (!online() || !root.MMComments || !Store.status().team) return;
+    try { root.MMComments.setExtra((await Store.api('GET', 'api/projects')).entries || []); } catch { /* en la próxima */ }
+  }
+  const refreshInboxSoon = () => { clearTimeout(inboxTimer); inboxTimer = setTimeout(refreshInbox, 400); };
+  setInterval(refreshInbox, 60000);
+
   // Avisos en directo: si el proyecto está abierto se refresca; si no, el botón marca mensajes nuevos.
   let timer = null;
   Store.on((e) => {
-    if (e.type === 'status') setFolder(folderId);
+    if (e.type === 'status') { setFolder(folderId); refreshInboxSoon(); }
     if (e.type !== 'project') return;
-    if (e.folderId === openId) { clearTimeout(timer); timer = setTimeout(load, 150); return; }
+    refreshInboxSoon();
+    if (e.folderId === openId) { clearTimeout(timer); timer = setTimeout(() => { if (!sugg) load(); }, 150); return; }
     if (e.kind === 'chat') { unread.add(e.folderId); setFolder(folderId); }
   });
 
