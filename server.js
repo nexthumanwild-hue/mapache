@@ -289,7 +289,7 @@ async function api(req, res, url, user) {
       const b = (await readJSON(req)) || {};
       if (typeof b.mediaId !== 'string' || !store.hasMedia(b.mediaId)) return send(res, 400, { error: 'Upload the image first' });
       const st = { id: crypto.randomUUID(), mediaId: b.mediaId, name: String(b.name || '').trim().slice(0, 60),
-        w: Math.max(1, Math.round(+b.w || 512)), h: Math.max(1, Math.round(+b.h || 512)), by: user ? user.id : null, createdAt: Date.now() };
+        w: Math.max(1, Math.round(+b.w || 512)), h: Math.max(1, Math.round(+b.h || 512)), kind: b.kind === 'video' ? 'video' : 'image', by: user ? user.id : null, createdAt: Date.now() };
       save([...list(), st]);
       return send(res, 200, st);
     }

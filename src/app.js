@@ -2194,6 +2194,7 @@
       it = { ...base, z: 0, w: extra.w || 640, h: extra.h || 420, color: 'gray', fill: false, name: t('Sección {n}', { n }) };
     } else if (type === 'video') {
       it = { ...base, w: extra.w || 560, h: extra.h || 315, mediaId: extra.mediaId || null, url: extra.url || null, embed: extra.embed || null, name: extra.name || '' };
+      if (extra.sticker) Object.assign(it, { sticker: true, loop: true });
     } else it = { ...base, w: extra.w, src: extra.src };
     if (extra.center !== false) {
       const w = it.w || (type === 'sticker' ? it.size + 8 : 120);
@@ -2375,13 +2376,15 @@
         host.innerHTML = `<iframe src="${esc(it.embed)}" title="${t('Vídeo')}" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen ` +
           'referrerpolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"></iframe><div class="video-grip"></div>';
       } else {
-        host.innerHTML = '<video controls playsinline preload="metadata"></video><div class="video-grip"></div>';
+        // Sticker de vídeo (stickers animados del equipo): se reproduce solo, en bucle, sin sonido ni controles.
+        host.innerHTML = it.sticker ? '<video autoplay muted loop playsinline preload="auto"></video>' : '<video controls playsinline preload="metadata"></video><div class="video-grip"></div>';
         const v = host.querySelector('video');
         if (it.url) v.src = it.url;
         else if (it.mediaId) loadMedia(it.mediaId).then((u) => { if (u) v.src = u; else host.innerHTML = `<div class="video-missing">${t('Este vídeo no está en este navegador')}</div><div class="video-grip"></div>`; });
       }
     }
     rec.el.classList.toggle('is-embed', !!it.embed);
+    rec.el.classList.toggle('is-sticker', !!it.sticker);
     const v = host.querySelector('video');
     if (v) v.loop = !!it.loop;
   }
@@ -2874,7 +2877,7 @@
     } else if (it.type === 'image') {
       parts.push(btn('menu-crop', UI.crop, t('Recortar'), { menu: true, on: !!it.crop }), btn('item-download', UI.download, t('Descargar imagen')));
     } else if (it.type === 'video') {
-      if (!it.embed) parts.push(btn('video-loop', UI.loop, t('Repetir en bucle'), { on: !!it.loop }));
+      if (!it.embed && !it.sticker) parts.push(btn('video-loop', UI.loop, t('Repetir en bucle'), { on: !!it.loop }));
       if (it.mediaId) parts.push(btn('item-download', UI.download, t('Descargar vídeo')));
       if (it.embed || it.url) parts.push(btn('video-open', UI.external, t('Abrir el original')));
     } else if (it.type === 'table') {
@@ -3211,23 +3214,32 @@
     const term = q.trim().toLowerCase();
     const me = Store.status().user;
     const hits = teamStickers.filter((s) => !term || (s.name || '').toLowerCase().includes(term));
-    return `<div class="icon-cat">${t('Del equipo')}<label class="ts-add" data-tip="${t('Sube PNG, WebP, GIF o JPG (puedes elegir varios)')}">+ ${t('Subir')}<input type="file" accept="image/png,image/webp,image/gif,image/jpeg" multiple hidden data-ts-upload></label></div>` +
+    return `<div class="icon-cat">${t('Del equipo')}<label class="ts-add" data-tip="${t('Sube PNG, WebP, GIF, JPG o WebM animado (puedes elegir varios)')}">+ ${t('Subir')}<input type="file" accept="image/png,image/webp,image/gif,image/jpeg,video/webm,.webm" multiple hidden data-ts-upload></label></div>` +
       (hits.length ? `<div class="ts-grid">${hits.map((s) => `<button class="ts-cell" data-act="team-sticker" data-arg="${s.id}" data-tip="${esc(s.name || '')}">` +
-        `<img src="api/media/${encodeURIComponent(s.mediaId)}" alt="" loading="lazy" draggable="false">` +
+        (s.kind === 'video' ? `<video src="api/media/${encodeURIComponent(s.mediaId)}#t=0.4" muted loop playsinline preload="metadata"></video>`
+          : `<img src="api/media/${encodeURIComponent(s.mediaId)}" alt="" loading="lazy" draggable="false">`) +
         (!me || !s.by || s.by === me.id || me.role === 'admin' ? `<span class="ts-del" data-act="team-sticker-del" data-arg="${s.id}" title="${t('Quitar de los stickers del equipo')}">×</span>` : '') + '</button>').join('')}</div>`
         : `<div class="ts-empty">${term ? t('Sin resultados') : t('Todavía no hay stickers del equipo. Sube los vuestros con «+ Subir».')}</div>`);
   }
   async function uploadTeamStickers(files) {
     let n = 0;
     for (const file of files) {
-      if (!/^image\/(png|webp|gif|jpeg)$/.test(file.type)) { toast(t('{name}: ese formato no vale (usa PNG, WebP, GIF o JPG)', { name: file.name })); continue; }
+      const video = /^video\/webm$/.test(file.type) || /\.webm$/i.test(file.name);
+      if (!video && !/^image\/(png|webp|gif|jpeg)$/.test(file.type)) { toast(t('{name}: ese formato no vale (usa PNG, WebP, GIF, JPG o WebM)', { name: file.name })); continue; }
       try {
-        const { src, w, h } = await imageFromFile(file, 512);
-        const blob = await (await fetch(src)).blob();
+        let blob, w, h;
+        if (video) {
+          blob = file.type ? file : new Blob([file], { type: 'video/webm' });
+          [w, h] = await videoSize(URL.createObjectURL(blob));
+        } else {
+          const img = await imageFromFile(file, 512);
+          ({ w, h } = img);
+          blob = await (await fetch(img.src)).blob();
+        }
         const mediaId = uid();
         const r = await fetch(`api/media/${mediaId}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type, 'X-Media-Name': encodeURIComponent(file.name) } });
         if (!r.ok) throw new Error(String(r.status));
-        await Store.api('POST', 'api/stickers', { mediaId, w, h, name: file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ') });
+        await Store.api('POST', 'api/stickers', { mediaId, w, h, kind: video ? 'video' : 'image', name: file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ') });
         n++;
       } catch (e) { toast(t('No se pudo subir {name}', { name: file.name })); }
     }
@@ -3237,6 +3249,7 @@
   async function placeTeamSticker(id, at) {
     const s = teamStickers.find((x) => x.id === id);
     if (!s) return;
+    if (s.kind === 'video') return createItem('video', at, { mediaId: s.mediaId, w: 180, h: Math.round((s.h * 180) / s.w), sticker: true, name: s.name });
     const blob = await (await fetch(`api/media/${encodeURIComponent(s.mediaId)}`)).blob();
     const src = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
     const w = 180;
@@ -3464,6 +3477,8 @@
       if (b && b.tagName !== 'INPUT') act(b.dataset.act, b.dataset.arg, b);
     });
   }
+  pop.addEventListener('mouseover', (e) => { const v = e.target.closest('.ts-cell')?.querySelector('video'); if (v) v.play().catch(() => {}); });
+  pop.addEventListener('mouseout', (e) => { const v = e.target.closest('.ts-cell')?.querySelector('video'); if (v) v.pause(); });
   pop.addEventListener('change', (e) => {
     if (e.target.matches('[data-ts-upload]') && e.target.files.length) uploadTeamStickers([...e.target.files]);
   });
@@ -4149,7 +4164,7 @@
       else if (it.type === 'text') it.w = Math.max(40, Math.round(s.ow + ddx));
       else if (it.type === 'sticker') it.size = Math.max(16, Math.round(s.size + Math.max(ddx, ddy)));
       else if (it.type === 'image') it.w = Math.max(40, Math.round(s.w + ddx));
-      else if (it.type === 'video') { it.w = Math.max(160, Math.round(s.w + ddx)); it.h = Math.round((it.w * s.h) / s.w); }
+      else if (it.type === 'video') { it.w = Math.max(it.sticker ? 48 : 160, Math.round(s.w + ddx)); it.h = Math.round((it.w * s.h) / s.w); }
       else if (it.type === 'shape') { it.w = Math.max(30, Math.round(s.w + ddx)); it.h = Math.max(24, Math.round(s.h + ddy)); delete it.baseH; }
       else if (it.type === 'section') { it.w = Math.max(160, Math.round(s.w + ddx)); it.h = Math.max(100, Math.round(s.h + ddy)); }
       else if (it.type === 'chart') { it.w = Math.max(260, Math.round(s.w + ddx)); it.h = Math.max(180, Math.round(s.h + ddy)); }
@@ -4253,7 +4268,7 @@
     if (d.kind === 'item' || d.kind === 'resize') {
       if (d.moving) { commit(d.before); return render(); }
       const it = doc.items[d.id];
-      if (d.kind === 'item' && d.clickEdit && it && it.type === 'video') { toggleVideo(d.id); return render(); }
+      if (d.kind === 'item' && d.clickEdit && it && it.type === 'video' && !it.sticker) { toggleVideo(d.id); return render(); }
       if (d.kind === 'item' && d.clickEdit && it && it.lines) return startItemEdit(d.id, { point: d.point });
       return render();
     }

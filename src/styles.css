@@ -821,3 +821,6 @@ body.readonly #toolbox, body.readonly #contextbar, body.readonly .qa { display: 
 .ts-cell:hover .ts-del { display: block; }
 .ts-del:hover { color: var(--danger, #f87171); }
 .ts-empty { font-size: 12px; color: var(--muted); padding: 4px 6px 10px; }
+.ts-cell video { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.mm-item.video.is-sticker .video-host { background: none; box-shadow: none; }
+.mm-item.video.is-sticker video { object-fit: contain; background: none; pointer-events: none !important; }
