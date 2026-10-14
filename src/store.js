@@ -115,6 +115,12 @@
       emit({ type: 'board', id });
       return pending ? pushBoard(id) : undefined;
     }
+    // Espacios: ya no puedes editarlo (403: vuelve la versión del servidor) o ya no lo ves (404: sale de aquí).
+    if (res.status === 403 || res.status === 404) {
+      await idb.sync.put({ key, rev: s ? s.rev : null, base: s && s.base, dirty: false });
+      if (res.status === 403) return pullBoard(id, -1);
+      return dropLocal(id);
+    }
     console.warn('Mapache: no se pudo guardar en el servidor', res.status);
   }
 
@@ -247,7 +253,8 @@
       if (d.deleted) serial(`b:${d.id}`, () => dropLocal(d.id));
       else serial(`b:${d.id}`, () => pullBoard(d.id, d.rev));
     });
-    es.addEventListener('folders', () => serial('folders', syncFolders));
+    // Con espacios, un cambio en las carpetas (por ejemplo, te comparten una) puede cambiar qué tableros ves.
+    es.addEventListener('folders', () => (team ? fullSync() : serial('folders', syncFolders)));
     es.addEventListener('show', (e) => emit({ type: 'open', id: JSON.parse(e.data).id }));
     es.addEventListener('export', (e) => emit({ type: 'export', ...JSON.parse(e.data) }));
     es.onerror = () => { if (mode === 'online') setMode('offline'); };

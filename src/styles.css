@@ -801,3 +801,9 @@ body.auth-open #main, body.auth-open #sidebar { visibility: hidden; }
 /* Solo lectura: sin herramientas de edición */
 body.readonly #toolbox, body.readonly #contextbar, body.readonly .qa { display: none !important; }
 @media (max-width: 640px) { #presence { display: none; } }
+
+/* Espacios: carpetas compartidas */
+.row .shared-tag { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); margin-left: 4px; flex: none; }
+.row .shared-tag svg { width: 13px; height: 13px; }
+.row .shared-tag small { font-size: 10.5px; }
+.row .shared-tag.mine { color: var(--accent-ink); }

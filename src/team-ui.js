@@ -20,6 +20,12 @@
     'Wrong email or password': 'Email o contraseña incorrectos',
     'Wrong password': 'Contraseña incorrecta',
     'Write your name': 'Escribe tu nombre',
+    'Only the owner can share this folder': 'Solo quien la creó puede compartir esta carpeta',
+    'Only the owner can delete this folder': 'Solo quien la creó puede borrar esta carpeta',
+    'Only the owner can move this folder out': 'Solo quien la creó puede sacarla de ahí',
+    'You cannot add things to that folder': 'No puedes añadir cosas a esa carpeta',
+    'You can only view this board': 'Solo puedes ver este tablero',
+    'A folder cannot go inside itself': 'Una carpeta no puede ir dentro de sí misma',
     'Too many attempts. Wait a few minutes and try again': 'Demasiados intentos. Espera unos minutos y vuelve a probar',
     'The setup code is not right. It is printed in the server log': 'El código de configuración no es correcto. Aparece en el registro del servidor',
     'This NOMIROR already has an admin. Log in instead': 'Este NOMIROR ya tiene admin. Entra con tu cuenta',
@@ -190,6 +196,46 @@
     for (const [cid, c] of cursors) if (!alive.has(cid) || Date.now() - c.at > 60000) { c.el.remove(); cursors.delete(cid); }
     placeCursors();
   }, 2000);
+
+  // ---------- Espacios: compartir una carpeta ----------
+
+  // Para cada persona del equipo: «No la ve», «Puede editar» o «Solo ver». Lo de dentro va con la carpeta.
+  async function openShare(folderId) {
+    const box = $('#team-modal');
+    const f = (await Store.folders.all()).find((x) => x.id === folderId);
+    if (!f) return;
+    const me = Store.status().user;
+    let users = Store.members();
+    try { users = (await Store.api('GET', 'api/team')).users; } catch { /* sin conexión: los últimos conocidos */ }
+    const shares = { ...(f.shares || {}) };
+    const LEVEL = () => ({ '': t('No la ve'), edit: t('Puede editar'), view: t('Solo ver') });
+    const others = users.filter((p) => p.id !== me.id);
+    box.hidden = false;
+    box.innerHTML = `<div class="modal-card tm-card" role="dialog" aria-modal="true"><button class="icon-btn about-close" data-tm-close aria-label="${esc(t('Cerrar'))}">${UI.close}</button>` +
+      `<h2>${esc(t('Compartir «{name}»', { name: f.name }))}</h2><p class="au-sub">${esc(t('Elige quién ve esta carpeta. Lo que hay dentro (mapas y subcarpetas) se comparte con ella.'))}</p>` +
+      `<div class="tm-people">${others.length ? others.map((p) => `<div class="tm-person" data-user="${esc(p.id)}">${avatar(p, 30)}<div class="tm-who"><b>${esc(p.name)}</b></div>` +
+        `<select data-share>${Object.entries(LEVEL()).map(([k, v]) => `<option value="${k}"${(shares[p.id] || '') === k ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></div>`).join('')
+        : `<p class="au-hint">${esc(t('Todavía no hay nadie más en el equipo. Cuando alguien entre, podrás compartir con esa persona.'))}</p>`}</div>` +
+      `<button class="primary" data-share-save>${esc(t('Guardar'))}</button><p class="au-error" hidden></p></div>`;
+    const card = box.querySelector('.tm-card');
+    card.onclick = async (e) => {
+      if (e.target.closest('[data-tm-close]')) { box.hidden = true; return; }
+      if (!e.target.closest('[data-share-save]')) return;
+      const next = {};
+      card.querySelectorAll('[data-user]').forEach((row) => { const v = row.querySelector('[data-share]').value; if (v) next[row.dataset.user] = v; });
+      try {
+        await Store.api('PUT', `api/folders/${encodeURIComponent(folderId)}/share`, { shares: next });
+        await Store.folders.put({ ...f, shares: next });
+        if (root.MMSidebar) root.MMSidebar.refresh();
+        box.hidden = true;
+        toast(t('Carpeta compartida'));
+      } catch (ex) {
+        const err = card.querySelector('.au-error');
+        err.textContent = msg(ex);
+        err.hidden = false;
+      }
+    };
+  }
 
   // ---------- Perfil, personas e invitaciones ----------
 
@@ -362,5 +408,5 @@
     renderPresence();
   }
 
-  root.MMTeamUI = { showAuth, init, fillAgent };
+  root.MMTeamUI = { showAuth, init, fillAgent, openShare };
 })(window);

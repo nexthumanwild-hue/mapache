@@ -195,7 +195,14 @@
   const snapshot = () => JSON.stringify(doc);
 
   // Rol de solo lectura (modo equipo): se puede mirar, mover la vista y exportar, pero no cambiar nada.
-  const readOnly = () => Store.status().role === 'viewer';
+  // Espacios: un tablero de una carpeta que te han compartido con «Solo ver» también es de solo lectura.
+  let viewOnly = false;
+  const readOnly = () => Store.status().role === 'viewer' || viewOnly;
+  async function syncAccess() {
+    const f = map && map.folderId ? (await Store.folders.all()).find((x) => x.id === map.folderId) : null;
+    viewOnly = !!(f && f.access === 'view');
+    document.body.classList.toggle('readonly', readOnly());
+  }
   function commit(before) {
     if (before === snapshot()) return;
     if (readOnly()) { doc = JSON.parse(before); render(); toast(t('Solo puedes ver este tablero')); return; }
@@ -314,7 +321,7 @@
         if (!e.deleted) await checkRemote();
       }
       Sidebar.refresh();
-    } else if (e.type === 'folders') Sidebar.refresh();
+    } else if (e.type === 'folders') { Sidebar.refresh(); syncAccess(); }
     else if (e.type === 'open' && e.id) {
       if (await Store.get(e.id)) { if (!map || map.id !== e.id) await openMap(e.id); window.focus(); }
     } else if (e.type === 'status') updateSaveTip();
@@ -4456,6 +4463,7 @@
     if (!m) return;
     syncBase = JSON.stringify(m);
     map = m;
+    await syncAccess();
     doc = normalizeDoc(m.doc);
     remotePending = false;
     Store.reportOpen(id);

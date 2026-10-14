@@ -61,7 +61,7 @@
         const count = countMaps(f.id);
         rows.push(`<div class="row folder" draggable="true" data-folder="${f.id}" style="--d:${depth}">` +
           `<span class="chev${f.collapsed ? '' : ' open'}">${UI.chevron}</span>${rowIcon(f, 'folder')}` +
-          `<span class="name">${esc(f.name)}</span><span class="count">${count || ''}</span>` +
+          `<span class="name">${esc(f.name)}</span>${sharedTag(f)}<span class="count">${count || ''}</span>` +
           `<button class="row-btn" data-add="${f.id}" title="${t('Nuevo mapa aquí')}">${UI.plus}</button>` +
           `<button class="row-btn" data-more-folder="${f.id}" title="${t('Opciones')}">${UI.more}</button></div>`);
         if (!f.collapsed) walk(f.id, depth + 1);
@@ -179,15 +179,27 @@
       [`${'   '.repeat(depth)}${name}`, () => (kind === 'folder' ? moveFolder(id, fid) : api.moveMap(id, fid).then(refresh))]));
   }
 
+  // Espacios (modo equipo): marca de las carpetas compartidas, contigo o por ti.
+  function sharedTag(f) {
+    const { esc } = api;
+    const UI = { users: api.SIDE_ICONS.users };
+    if (f.ownerName) return `<span class="shared-tag" title="${esc(t('Compartida por {name}', { name: f.ownerName }))}">${UI.users}${f.access === 'view' ? `<small>${esc(t('ver'))}</small>` : ''}</span>`;
+    const n = f.shares ? Object.keys(f.shares).length : 0;
+    return n ? `<span class="shared-tag mine" title="${esc(t('Compartida con {n} personas', { n }))}">${UI.users}<small>${n}</small></span>` : '';
+  }
+
   function folderMenu(anchor, id) {
+    const f = folders.find((x) => x.id === id) || {};
+    if (f.access === 'view') return openMenu(anchor, [[t('Solo puedes ver esta carpeta'), () => {}]]);
+    const share = f.access === 'owner' && root.MMTeamUI && api.Store.status().team ? [[t('Compartir…'), () => root.MMTeamUI.openShare(id)]] : [];
     openMenu(anchor, [
+      ...share,
       [t('Nuevo mapa aquí'), () => api.createMap(id)],
       [t('Nueva subcarpeta'), () => newFolder(id)],
       [t('Renombrar'), () => rename('folder', id)],
       [t('Personalizar…'), () => picker(anchor, 'folder', id)],
       [t('Mover a…'), () => moveMenu(anchor, 'folder', id)],
-      null,
-      [t('Borrar carpeta'), () => deleteFolder(id), 'danger'],
+      ...(f.access && f.access !== 'owner' ? [] : [null, [t('Borrar carpeta'), () => deleteFolder(id), 'danger']]),
     ]);
   }
 

@@ -95,6 +95,15 @@ test('team: invitations create accounts with their role; viewers cannot write', 
   assert.strictEqual((await req('POST', '/api/auth/accept', { body: { token: vtoken, email: 'other@example.com', password: 'viewer-pass' }, headers: { Origin: ORIGIN } })).status, 403);
   const vacc = await req('POST', '/api/auth/accept', { body: { token: vtoken, email: 'vera@example.com', name: 'Vera', password: 'viewer-pass' }, headers: { Origin: ORIGIN } });
   viewerCookie = cookieOf(vacc);
+  // Espacios: b1 es del espacio de Ana; nadie más lo ve hasta que lo mete en una carpeta compartida.
+  assert.strictEqual((await req('GET', '/api/boards/b1', { headers: { Cookie: viewerCookie } })).status, 404);
+  const ids = (await req('GET', '/api/team', { headers: { Cookie: admin } })).json.users;
+  const luisId = ids.find((u) => u.email === 'luis@example.com').id;
+  const veraId = ids.find((u) => u.email === 'vera@example.com').id;
+  assert.strictEqual((await req('PUT', '/api/folders/f1', { body: { id: 'f1', name: 'Team', parentId: null }, headers: as(admin) })).status, 200);
+  assert.strictEqual((await req('PUT', '/api/folders/f1/share', { body: { shares: { [luisId]: 'edit', [veraId]: 'view' } }, headers: as(admin) })).status, 200);
+  const own = (await req('GET', '/api/boards/b1', { headers: { Cookie: admin } })).json;
+  assert.strictEqual((await req('PUT', '/api/boards/b1', { body: { board: { ...own, folderId: 'f1' }, baseRev: own.rev }, headers: as(admin) })).status, 200);
   const b = (await req('GET', '/api/boards/b1', { headers: { Cookie: viewerCookie } })).json;
   assert.strictEqual(b.title, 'Team board');
   assert.strictEqual((await req('PUT', '/api/boards/b1', { body: { board: b, baseRev: b.rev }, headers: as(viewerCookie) })).status, 403);
@@ -117,7 +126,7 @@ test('team: agents use personal tokens; a viewer token can only read', async () 
   assert.strictEqual((await mcp('mpk_wrong', { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 401);
   const list = await mcp(token, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
   assert.ok(list.json.result.tools.length >= 18);
-  const made = await mcp(token, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'create_board', arguments: { title: 'From the agent' } } });
+  const made = await mcp(token, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'create_board', arguments: { title: 'From the agent', folder: 'Team' } } });
   assert.match(made.json.result.content[0].text, /Created board/);
   const vt = (await req('POST', '/api/me/tokens', { body: { name: 'Viewer agent' }, headers: as(viewerCookie) })).json.token;
   const denied = await mcp(vt, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'create_board', arguments: { title: 'Nope' } } });
@@ -129,6 +138,38 @@ test('team: agents use personal tokens; a viewer token can only read', async () 
   const mine = (await req('GET', '/api/me/tokens', { headers: { Cookie: editorCookie } })).json.tokens;
   await req('DELETE', `/api/me/tokens/${mine[0].id}`, { headers: as(editorCookie) });
   assert.strictEqual((await mcp(token, { jsonrpc: '2.0', id: 5, method: 'tools/list' })).status, 401);
+});
+
+test('spaces: private by default, shared per person and only by the owner', async () => {
+  const users = (await req('GET', '/api/team', { headers: { Cookie: admin } })).json.users;
+  const luisId = users.find((u) => u.email === 'luis@example.com').id;
+  const veraId = users.find((u) => u.email === 'vera@example.com').id;
+  const login = await req('POST', '/api/auth/login', { body: { email: 'luis@example.com', password: 'another-pass' }, headers: { Origin: ORIGIN } });
+  const luis = cookieOf(login);
+  const doc = { rootId: 'r', settings: {}, nodes: { r: { id: 'r', parentId: null, order: 1, lines: ['Mine'] } }, items: {} };
+  // Lo de Luis en su espacio: ni Ana (admin) lo ve.
+  assert.strictEqual((await req('PUT', '/api/boards/luis1', { body: { board: { id: 'luis1', title: 'Luis private', doc }, baseRev: null }, headers: as(luis) })).status, 200);
+  assert.strictEqual((await req('GET', '/api/boards/luis1', { headers: { Cookie: admin } })).status, 404);
+  assert.ok(!(await req('GET', '/api/boards', { headers: { Cookie: admin } })).json.some((b) => b.id === 'luis1'));
+  assert.strictEqual((await req('PUT', '/api/boards/luis1', { body: { board: { id: 'luis1', title: 'Hijack', doc } }, headers: as(admin) })).status, 404);
+  // Luis no puede compartir ni borrar la carpeta de Ana, aunque pueda editar dentro.
+  assert.strictEqual((await req('PUT', '/api/folders/f1/share', { body: { shares: { [veraId]: 'edit' } }, headers: as(luis) })).status, 403);
+  assert.strictEqual((await req('DELETE', '/api/folders/f1', { headers: as(luis) })).status, 403);
+  // Una carpeta de Luis compartida con Ana para editar: Ana la ve con su nombre y puede crear dentro.
+  await req('PUT', '/api/folders/lf', { body: { id: 'lf', name: 'Luis shared', parentId: null }, headers: as(luis) });
+  await req('PUT', '/api/folders/lf/share', { body: { shares: { [users.find((u) => u.email === 'ana@example.com').id]: 'edit' } }, headers: as(luis) });
+  const seen = (await req('GET', '/api/folders', { headers: { Cookie: admin } })).json.folders.find((f) => f.id === 'lf');
+  assert.strictEqual(seen.access, 'edit');
+  assert.strictEqual(seen.ownerName, 'Luis');
+  assert.strictEqual(seen.shares, undefined);
+  assert.strictEqual((await req('PUT', '/api/boards/ana2', { body: { board: { id: 'ana2', title: 'In Luis folder', folderId: 'lf', doc }, baseRev: null }, headers: as(admin) })).status, 200);
+  assert.ok((await req('GET', '/api/boards', { headers: { Cookie: luis } })).json.some((b) => b.id === 'ana2'));
+  // Vera (solo ver en f1) no puede crear en f1; y si se deja de compartir, deja de verla.
+  assert.strictEqual((await req('PUT', '/api/boards/v1', { body: { board: { id: 'v1', title: 'x', folderId: 'f1', doc }, baseRev: null }, headers: as(viewerCookie) })).status, 403);
+  assert.ok((await req('GET', '/api/folders', { headers: { Cookie: viewerCookie } })).json.folders.some((f) => f.id === 'f1'));
+  await req('PUT', '/api/folders/f1/share', { body: { shares: { [luisId]: 'edit' } }, headers: as(admin) });
+  assert.ok(!(await req('GET', '/api/folders', { headers: { Cookie: viewerCookie } })).json.folders.some((f) => f.id === 'f1'));
+  assert.strictEqual((await req('GET', '/api/boards/b1', { headers: { Cookie: viewerCookie } })).status, 404);
 });
 
 test('team: profile, roles, logout and too many wrong passwords', async () => {

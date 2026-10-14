@@ -11,6 +11,7 @@ const path = require('path');
 const crypto = require('crypto');
 const Store = require('./lib/store');
 const MCP = require('./lib/mcp');
+const Spaces = require('./lib/spaces');
 const Launch = require('./lib/launch');
 const { version } = require('./package.json');
 
@@ -97,7 +98,7 @@ function checkBoard(id) {
   let rev = null;
   try { rev = store.boardRev(id); } catch { return; }
   if (rev === null) { if (known.has(id)) { known.delete(id); broadcast('board', { id, deleted: true }); } return; }
-  if (known.get(id) !== rev) { known.set(id, rev); broadcast('board', { id, rev }); }
+  if (known.get(id) !== rev) { known.set(id, rev); broadcast('board', { id, rev }, seesBoard(id)); }
 }
 function checkFolders() {
   let rev;
@@ -190,6 +191,10 @@ if (TEAM) {
   }
 }
 const canWrite = (user) => !TEAM || (user && user.role !== 'viewer');
+// Espacios: en modo equipo cada persona ve su espacio y lo que le comparten (ver lib/spaces.js).
+const spaceOf = (user) => (TEAM && user ? Spaces.scope(store, user, { userById: (id) => auth.userById(id) }) : store);
+// Los avisos de un tablero solo llegan a quien puede verlo.
+const seesBoard = (id) => (c) => !TEAM || (!!c.user && !!Spaces.boardAccess(store.readFolders().folders, c.user, store.getBoard(id)));
 
 // Sin sesión válida (rol cambiado, cuenta quitada, contraseña nueva o cierre de sesión): se cierran sus pestañas en
 // directo para que vuelvan a la pantalla de acceso en el momento.
@@ -236,34 +241,42 @@ async function api(req, res, url, user) {
     req.on('close', () => { clients.delete(res); presence(); });
     return;
   }
+  const st = spaceOf(user);
   if (kind === 'boards') {
-    if (!id && m === 'GET') return send(res, 200, store.listBoards());
-    if (id && m === 'GET') { const b = store.getBoard(id); return b ? send(res, 200, b) : send(res, 404, { error: 'Not found' }); }
+    if (!id && m === 'GET') return send(res, 200, st.listBoards());
+    if (id && m === 'GET') { const b = st.getBoard(id); return b ? send(res, 200, b) : send(res, 404, { error: 'Not found' }); }
     if (id && m === 'PUT') {
       const body = await readJSON(req);
       if (!body || !body.board || body.board.id !== id || !body.board.doc) return send(res, 400, { error: 'Expected { board, baseRev }' });
       try {
-        const saved = store.putBoard(body.board, { baseRev: body.baseRev === undefined ? undefined : body.baseRev });
+        const saved = st.putBoard(body.board, { baseRev: body.baseRev === undefined ? undefined : body.baseRev });
         known.set(id, saved.rev);
-        broadcast('board', { id, rev: saved.rev });
+        broadcast('board', { id, rev: saved.rev }, seesBoard(id));
         return send(res, 200, { rev: saved.rev });
       } catch (e) {
         if (e instanceof Store.Conflict) return send(res, 409, { board: e.current });
         throw e;
       }
     }
-    if (id && m === 'DELETE') { store.removeBoard(id); known.delete(id); broadcast('board', { id, deleted: true }); return send(res, 200, { ok: true }); }
+    if (id && m === 'DELETE') { st.removeBoard(id); known.delete(id); broadcast('board', { id, deleted: true }); return send(res, 200, { ok: true }); }
   }
   if (kind === 'folders') {
-    if (!id && m === 'GET') return send(res, 200, store.readFolders());
-    if (id && m === 'PUT') {
-      const f = await readJSON(req);
-      if (!f || f.id !== id) return send(res, 400, { error: 'Expected a folder' });
-      foldersRev = store.putFolder(f).rev;
+    if (!id && m === 'GET') return send(res, 200, st.readFolders());
+    // Compartir una carpeta (solo quien es dueña): { shares: { userId: 'edit' | 'view' } }.
+    if (id && parts[2] === 'share' && m === 'PUT' && TEAM) {
+      const b = await readJSON(req);
+      foldersRev = st.setShares(id, b && b.shares).rev;
       broadcast('folders', { rev: foldersRev });
       return send(res, 200, { rev: foldersRev });
     }
-    if (id && m === 'DELETE') { foldersRev = store.removeFolder(id).rev; broadcast('folders', { rev: foldersRev }); return send(res, 200, { rev: foldersRev }); }
+    if (id && m === 'PUT') {
+      const f = await readJSON(req);
+      if (!f || f.id !== id) return send(res, 400, { error: 'Expected a folder' });
+      foldersRev = st.putFolder(f).rev;
+      broadcast('folders', { rev: foldersRev });
+      return send(res, 200, { rev: foldersRev });
+    }
+    if (id && m === 'DELETE') { foldersRev = st.removeFolder(id).rev; broadcast('folders', { rev: foldersRev }); return send(res, 200, { rev: foldersRev }); }
   }
   if (kind === 'media' && id) {
     if (m === 'GET') {
@@ -368,7 +381,7 @@ async function mcpHTTP(req, res, user) {
   const key = user ? user.id : 'local';
   const ci = msg && msg.method === 'initialize' && msg.params && msg.params.clientInfo;
   if (ci && (ci.title || ci.name)) mcpClients.set(key, { name: String(ci.title || ci.name).slice(0, 80) });
-  const server = MCP.makeServer({ store, user: TEAM ? user : null, client: mcpClients.get(key) || null, open: (id, launch) => openFromHere(id, launch, user), exportBoard: (id, format) => exportHere(id, format, user) });
+  const server = MCP.makeServer({ store: spaceOf(TEAM ? user : null), user: TEAM ? user : null, client: mcpClients.get(key) || null, open: (id, launch) => openFromHere(id, launch, user), exportBoard: (id, format) => exportHere(id, format, user) });
   const out = await server.handle(msg);
   if (!out) { res.writeHead(202); return res.end(); }
   return send(res, 200, out);
