@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const Store = require('./lib/store');
 const MCP = require('./lib/mcp');
 const Spaces = require('./lib/spaces');
+const Previews = require('./lib/previews');
 const Launch = require('./lib/launch');
 const { version } = require('./package.json');
 
@@ -325,8 +326,15 @@ async function api(req, res, url, user) {
       if (!md) return send(res, 404, { error: 'Not found' });
       // Solo tipos de vídeo, audio o imagen: nada que el navegador pudiera ejecutar como página.
       const type = /^(video|audio|image)\/[\w.+-]+$/i.test(md.type || '') && !/svg/i.test(md.type) ? md.type : 'application/octet-stream';
-      const head = { 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'X-Media-Name': encodeURIComponent(md.name || ''), 'Cache-Control': 'private, max-age=31536000, immutable', 'Accept-Ranges': 'bytes' };
-      const size = fs.statSync(md.file).size;
+      // ?preview=1: la copia ligera del vídeo si ya está hecha (si no, el original); ?poster=1: su portada.
+      const q = new URL(req.url, 'http://x').searchParams;
+      let file = md.file, ctype = type;
+      if (q.has('poster')) {
+        if (!fs.existsSync(Previews.posterOf(md.file))) return send(res, 404, { error: 'Not found' });
+        file = Previews.posterOf(md.file); ctype = 'image/jpeg';
+      } else if (q.has('preview') && fs.existsSync(Previews.previewOf(md.file))) { file = Previews.previewOf(md.file); ctype = 'video/mp4'; }
+      const head = { 'Content-Type': ctype, 'X-Content-Type-Options': 'nosniff', 'X-Media-Name': encodeURIComponent(md.name || ''), 'Cache-Control': 'private, max-age=31536000, immutable', 'Accept-Ranges': 'bytes' };
+      const size = fs.statSync(file).size;
       // Por trozos (Range): el vídeo empieza a verse sin bajarlo entero, se puede saltar, y Safari/iPhone lo exigen.
       const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ''));
       if (range && (range[1] || range[2])) {
@@ -334,15 +342,17 @@ async function api(req, res, url, user) {
         let end = range[1] && range[2] ? Math.min(+range[2], size - 1) : size - 1;
         if (start >= size || start > end) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
         res.writeHead(206, { ...head, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 });
-        return fs.createReadStream(md.file, { start, end }).pipe(res);
+        return fs.createReadStream(file, { start, end }).pipe(res);
       }
       res.writeHead(200, { ...head, 'Content-Length': size });
-      return fs.createReadStream(md.file).pipe(res);
+      return fs.createReadStream(file).pipe(res);
     }
     if (m === 'HEAD') { res.writeHead(store.hasMedia(id) ? 200 : 404); return res.end(); }
     if (m === 'PUT') {
       const buf = await readBody(req);
-      store.putMedia(id, buf, { type: String(req.headers['content-type'] || 'application/octet-stream'), name: decodeURIComponent(String(req.headers['x-media-name'] || '')) });
+      const type = String(req.headers['content-type'] || 'application/octet-stream');
+      store.putMedia(id, buf, { type, name: decodeURIComponent(String(req.headers['x-media-name'] || '')) });
+      Previews.schedule(store.getMedia(id).file, type);
       return send(res, 200, { ok: true });
     }
   }

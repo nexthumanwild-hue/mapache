@@ -2415,7 +2415,11 @@
           host.insertAdjacentHTML('afterbegin', `<div class="video-loading">${t('Cargando vídeo…')}</div>`);
           v.addEventListener('loadeddata', () => host.querySelector('.video-loading')?.remove(), { once: true });
           v.addEventListener('error', fail, { once: true });
-          loadMedia(it.mediaId).then((u) => { if (u) v.src = u; else fail(); });
+          loadMedia(it.mediaId).then((u) => {
+            if (!u) return fail();
+            // Desde el servidor: la copia ligera (y su portada, que sale al instante). El original, al descargarlo.
+            if (u.startsWith('api/media/')) { v.src = `${u}?preview=1`; if (!it.sticker) v.poster = `${u}?poster=1`; } else v.src = u;
+          });
         }
       }
     }
