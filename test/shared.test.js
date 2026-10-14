@@ -67,8 +67,20 @@ test('shared: each name is one person, the first one administers', async () => {
   assert.strictEqual(boards.status, 200);
 });
 
+test('shared: with a personal password, the team password no longer opens that space', async () => {
+  const leo = await enter({ name: 'Leo', password: 'la-del-equipo' });
+  const h = { Cookie: cookieOf(leo), Origin: ORIGIN, 'Content-Type': 'application/json' };
+  assert.strictEqual((await req('PATCH', '/api/me', { body: { currentPassword: 'mal', password: 'leo-propia-1' }, headers: h })).status, 403);
+  assert.strictEqual((await req('PATCH', '/api/me', { body: { currentPassword: 'la-del-equipo', password: 'leo-propia-1' }, headers: h })).status, 200);
+  assert.strictEqual((await enter({ name: 'Leo', password: 'la-del-equipo' }, '10.0.0.3')).status, 401);
+  const own = await enter({ name: 'leo', password: 'leo-propia-1' }, '10.0.0.3');
+  assert.strictEqual(own.status, 200);
+  assert.strictEqual(own.json.user.personal, true);
+  assert.strictEqual((await enter({ name: 'Nueva', password: 'la-del-equipo' }, '10.0.0.3')).status, 200);
+});
+
 test('shared: only failures count, per forwarded address', async () => {
   for (let i = 0; i < 20; i++) assert.strictEqual((await enter({ name: 'X', password: 'mal' }, '10.9.9.9')).status, 401);
   assert.strictEqual((await enter({ name: 'X', password: 'la-del-equipo' }, '10.9.9.9')).status, 429);
-  for (let i = 0; i < 15; i++) assert.strictEqual((await enter({ name: 'Leo', password: 'la-del-equipo' }, '10.0.0.2')).status, 200);
+  for (let i = 0; i < 15; i++) assert.strictEqual((await enter({ name: 'Ana López', password: 'la-del-equipo' }, '10.0.0.2')).status, 200);
 });

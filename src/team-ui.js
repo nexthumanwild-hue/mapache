@@ -68,11 +68,11 @@
         field('password', t('Contraseña (8 caracteres o más)'), 'password', 'autocomplete="new-password" minlength="8"') +
         `<button class="primary au-go" type="submit">${esc(t('Crear cuenta y entrar'))}</button>`;
     } else if (view === 'shared') {
-      body = `<h1>${esc(t('Entra en NOMIROR'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Escribe tu nombre y la contraseña del equipo.'))}</p>` +
+      body = `<h1>${esc(t('Entra en NOMIROR'))}</h1><p class="au-sub">${esc(expired ? t('Tu sesión ha terminado. Vuelve a entrar.') : t('Escribe tu nombre y tu contraseña. Si es tu primera vez, usa la del equipo.'))}</p>` +
         field('name', t('Tu nombre'), 'text', 'autocomplete="name"') +
-        field('password', t('Contraseña del equipo'), 'password', 'autocomplete="current-password"') +
+        field('password', t('Contraseña'), 'password', 'autocomplete="current-password"') +
         `<button class="primary au-go" type="submit">${esc(t('Entrar'))}</button>` +
-        `<p class="au-hint">${esc(t('Usa siempre el mismo nombre: así conservas tu color y tus tokens de agente.'))}</p>`;
+        `<p class="au-hint">${esc(t('Después, ponte tu propia contraseña en Tu perfil: así nadie más puede entrar en tu espacio.'))}</p>`;
     } else if (view === 'accept') {
       body = `<h1>${esc(t('Te han invitado a NOMIROR'))}</h1><p class="au-sub">${esc(t('Crea tu cuenta para entrar en los tableros del equipo.'))} <span class="au-role">${esc(ROLE()[inv.role] || inv.role)}</span></p>` +
         field('name', t('Tu nombre'), 'text', 'autocomplete="name"') +
@@ -254,7 +254,7 @@
         `<div class="au-field"><span>${esc(t('Color'))}</span><div class="tm-colors">${COLORS.map((c) => `<button class="tm-color${c === u.color ? ' on' : ''}" data-color="${c}" style="--c:${c}" aria-label="${c}"></button>`).join('')}</div></div>` +
         `<button class="primary" data-tm-save="profile">${esc(t('Guardar'))}</button>` +
         `<h3>${esc(t('Cambiar la contraseña'))}</h3>` +
-        `<label class="au-field"><span>${esc(t('Contraseña actual'))}</span><input name="current" type="password" autocomplete="current-password"></label>` +
+        `<label class="au-field"><span>${esc(Store.status().shared && !u.personal ? t('Contraseña actual (la del equipo si aún no tienes una propia)') : t('Contraseña actual'))}</span><input name="current" type="password" autocomplete="current-password"></label>` +
         `<label class="au-field"><span>${esc(t('Contraseña nueva (8 caracteres o más)'))}</span><input name="next" type="password" autocomplete="new-password" minlength="8"></label>` +
         `<button class="ghost" data-tm-save="password">${esc(t('Cambiar la contraseña'))}</button>`;
     } else {
