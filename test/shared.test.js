@@ -101,6 +101,30 @@ test('stickers: groups, per-person uses and renaming a group', async () => {
   assert.strictEqual((await req('GET', '/api/media/st1', { headers: { ...h(leo), Range: 'bytes=999-' } })).status, 416);
 });
 
+test('projects: chat for whoever sees the folder, tasks for whoever can edit it', async () => {
+  const ana = await enter({ name: 'Ana López', password: 'ana-propia-1' });
+  const leo = await enter({ name: 'Leo', password: 'leo-nueva-22' });
+  const eva = await enter({ name: 'Eva', password: 'eva-propia-1', create: true });
+  const h = (r) => ({ Cookie: cookieOf(r), Origin: ORIGIN });
+  await req('PUT', '/api/folders/pf', { body: { id: 'pf', name: 'Proyecto', parentId: null }, headers: h(ana) });
+  await req('PUT', '/api/folders/pf/share', { body: { shares: { [leo.json.user.id]: 'view' } }, headers: h(ana) });
+  const task = (await req('POST', '/api/projects/pf/tasks', { body: { title: 'Grabar vídeo' }, headers: h(ana) })).json;
+  assert.strictEqual(task.status, 'todo');
+  assert.strictEqual((await req('PATCH', `/api/projects/pf/tasks/${task.id}`, { body: { status: 'review', assignee: leo.json.user.id }, headers: h(ana) })).json.status, 'review');
+  assert.strictEqual((await req('PATCH', `/api/projects/pf/tasks/${task.id}`, { body: { status: 'nope' }, headers: h(ana) })).status, 400);
+  // Leo (solo ver): lee y chatea, pero no toca las tareas.
+  assert.strictEqual((await req('POST', '/api/projects/pf/chat', { body: { text: 'Hola equipo' }, headers: h(leo) })).status, 200);
+  assert.strictEqual((await req('POST', '/api/projects/pf/tasks', { body: { title: 'x' }, headers: h(leo) })).status, 403);
+  const seen = (await req('GET', '/api/projects/pf', { headers: h(leo) })).json;
+  assert.strictEqual(seen.canEdit, false);
+  assert.strictEqual(seen.tasks[0].assignee, leo.json.user.id);
+  assert.strictEqual(seen.chat[0].text, 'Hola equipo');
+  assert.strictEqual(seen.chat[0].name, 'Leo');
+  // Eva no tiene acceso a la carpeta: ni la ve.
+  assert.strictEqual((await req('GET', '/api/projects/pf', { headers: h(eva) })).status, 404);
+  assert.strictEqual((await req('POST', '/api/projects/pf/chat', { body: { text: 'x' }, headers: h(eva) })).status, 404);
+});
+
 test('shared: only failures count, per forwarded address', async () => {
   for (let i = 0; i < 20; i++) assert.strictEqual((await enter({ name: 'Leo', password: 'mal' }, '10.9.9.9')).status, 401);
   assert.strictEqual((await enter({ name: 'Leo', password: 'leo-nueva-22' }, '10.9.9.9')).status, 429);

@@ -4653,6 +4653,7 @@
     titleInput.placeholder = titleOf({ ...map, title: '' });
     const path = Sidebar.folderPath(map.folderId || null);
     $('#breadcrumb').textContent = path.length ? `${path.map((f) => f.name).join(' / ')} /` : '';
+    if (window.MMProject) window.MMProject.setFolder(map.folderId || null);
   }
 
   async function openMap(id) {

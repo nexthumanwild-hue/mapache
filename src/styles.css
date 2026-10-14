@@ -832,3 +832,48 @@ body.readonly #toolbox, body.readonly #contextbar, body.readonly .qa { display: 
 .dialog-input { display: block; width: 100%; margin-top: 12px; }
 .video-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #cbd5e1; font-size: 13px; pointer-events: none; }
 .video-missing .video-retry { margin-top: 8px; pointer-events: auto; }
+
+/* Proyectos: tareas (tipo Trello) y chat de cada carpeta */
+#project-btn { position: relative; }
+#project-btn svg { width: 18px; height: 18px; }
+.pj-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: #f87171; box-shadow: 0 0 0 2px var(--bar); }
+.pj-card { width: min(1280px, 96vw); height: min(820px, 90vh); display: flex; flex-direction: column; background: var(--panel); color: var(--ink);
+  border: 1px solid var(--bar-border); border-radius: 14px; box-shadow: 0 20px 60px var(--shadow); overflow: hidden; }
+.pj-head { display: flex; align-items: baseline; gap: 10px; padding: 14px 16px 12px 20px; border-bottom: 1px solid var(--bar-border); }
+.pj-head h2 { margin: 0; font-size: 17px; }
+.pj-sub { color: var(--muted); font-size: 12.5px; }
+.pj-close { margin-left: auto; font-size: 20px; }
+.pj-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 340px; }
+.pj-board { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 10px; padding: 14px; overflow: auto; align-items: start; }
+.pj-col { background: var(--panel-2, rgb(255 255 255 / 0.03)); border: 1px solid var(--bar-border); border-radius: 12px; padding: 8px; display: grid; gap: 8px; min-height: 120px; }
+.pj-col.drop { border-color: var(--accent); background: var(--sel-bg); }
+.pj-col header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px; font-size: 13px; }
+.pj-col header span { color: var(--muted); font-size: 12px; }
+.pj-cards { display: grid; gap: 6px; }
+.pj-task { background: var(--bar); border: 1px solid var(--bar-border); border-radius: 9px; padding: 8px 10px; cursor: pointer; display: grid; gap: 6px; }
+.pj-task:hover { border-color: var(--accent); }
+.pj-task.dragging { opacity: 0.4; }
+.pj-task p { margin: 0; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; white-space: pre-wrap; }
+.pj-note { color: var(--muted); font-size: 12px; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pj-task footer { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.pj-task footer:empty { display: none; }
+.pj-edit { cursor: default; }
+.pj-edit textarea, .pj-edit select, .pj-add input, .pj-send textarea { width: 100%; font: 13px var(--ui-font); color: var(--ink); background: var(--input-bg); border: 1px solid var(--bar-border); border-radius: 8px; padding: 7px 9px; resize: vertical; }
+.pj-edit textarea:focus, .pj-add input:focus, .pj-send textarea:focus { outline: none; border-color: var(--accent); }
+.pj-edit-btns { display: flex; gap: 6px; justify-content: flex-end; }
+.pj-edit-btns .danger { margin-right: auto; color: #f87171; }
+.pj-add input { background: transparent; border-style: dashed; }
+.pj-chat { border-left: 1px solid var(--bar-border); display: flex; flex-direction: column; min-height: 0; }
+.pj-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.pj-msg { display: flex; gap: 8px; align-items: flex-end; }
+.pj-msg.grouped { padding-left: 34px; margin-top: -2px; }
+.pj-msg.mine { justify-content: flex-end; padding-left: 40px; }
+.pj-bubble { background: var(--bar); border: 1px solid var(--bar-border); border-radius: 12px; padding: 6px 10px; max-width: 100%; }
+.pj-msg.mine .pj-bubble { background: var(--sel-bg); border-color: transparent; }
+.pj-bubble b { font-size: 12px; }
+.pj-bubble p { margin: 2px 0; font-size: 13px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pj-bubble time { font-size: 10.5px; color: var(--muted); }
+.pj-empty { color: var(--muted); font-size: 13px; text-align: center; margin: auto; }
+.pj-send { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--bar-border); align-items: flex-end; }
+.pj-send textarea { resize: none; max-height: 120px; }
+@media (max-width: 900px) { .pj-body { grid-template-columns: 1fr; grid-template-rows: 1fr 280px; } .pj-chat { border-left: 0; border-top: 1px solid var(--bar-border); } }

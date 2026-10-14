@@ -257,6 +257,7 @@
     // Con espacios, un cambio en las carpetas (por ejemplo, te comparten una) puede cambiar qué tableros ves.
     es.addEventListener('folders', () => (team ? fullSync() : serial('folders', syncFolders)));
     es.addEventListener('stickers', () => emit({ type: 'stickers' }));
+    es.addEventListener('project', (e) => emit({ type: 'project', ...JSON.parse(e.data) }));
     es.addEventListener('show', (e) => emit({ type: 'open', id: JSON.parse(e.data).id }));
     es.addEventListener('export', (e) => emit({ type: 'export', ...JSON.parse(e.data) }));
     es.onerror = () => { if (mode === 'online') setMode('offline'); };

@@ -190,8 +190,9 @@
 
   function folderMenu(anchor, id) {
     const f = folders.find((x) => x.id === id) || {};
-    if (f.access === 'view') return openMenu(anchor, [[t('Solo puedes ver esta carpeta'), () => {}]]);
+    if (f.access === 'view') return openMenu(anchor, [...(root.MMProject && api.Store.status().mode === 'online' ? [[t('Chat y tareas'), () => root.MMProject.open(id)]] : []), [t('Solo puedes ver esta carpeta'), () => {}]]);
     const share = f.access === 'owner' && root.MMTeamUI && api.Store.status().team ? [[t('Compartir…'), () => root.MMTeamUI.openShare(id)]] : [];
+    if (root.MMProject && api.Store.status().mode === 'online') share.unshift([t('Chat y tareas'), () => root.MMProject.open(id)]);
     openMenu(anchor, [
       ...share,
       [t('Nuevo mapa aquí'), () => api.createMap(id)],
